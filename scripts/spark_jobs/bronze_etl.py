@@ -79,6 +79,7 @@ def load_csv(filename, name):
     return df, count
 
 def save_bronze(df, parquet_name, pg_table, count, partition_by=None):
+    from pyspark.sql.types import BooleanType
     df_bronze = _tag_tenant(df).withColumn("loaded_at", F.current_timestamp())
 
     parquet_path = f"{BRONZE_PATH}/{parquet_name}"
@@ -88,7 +89,15 @@ def save_bronze(df, parquet_name, pg_table, count, partition_by=None):
     writer.parquet(parquet_path)
     print(f"   [OK] Parquet saved: {parquet_path}")
 
-    df_bronze.write \
+    # Cast BooleanType → Integer before JDBC write.
+    # inferSchema reads TRUE/FALSE as BooleanType but PG tables define
+    # these columns as INTEGER, causing a type mismatch at write time.
+    df_pg = df_bronze
+    for field in df_bronze.schema.fields:
+        if isinstance(field.dataType, BooleanType):
+            df_pg = df_pg.withColumn(field.name, F.col(field.name).cast("integer"))
+
+    df_pg.write \
         .format("jdbc") \
         .mode("overwrite") \
         .option("url", PG_URL) \
@@ -99,7 +108,7 @@ def save_bronze(df, parquet_name, pg_table, count, partition_by=None):
         .option("truncate", "true") \
         .option("batchsize", "1000") \
         .save()
-    
+
     print(f"   [OK] PostgreSQL loaded: {pg_table} ({count:,} rows)")
     df.unpersist()
 
