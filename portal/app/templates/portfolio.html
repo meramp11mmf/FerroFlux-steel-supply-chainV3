@@ -9,10 +9,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Hanken+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --graphite:#0c0d0f; --graphite-2:#141619; --graphite-3:#1c1f24;
-    --line:#2a2e35; --ash:#8b93a1; --steel:#c9d2de;
-    --ember:#ff5a1f; --ember-2:#ff8a3d; --molten:#ffb347;
-    --cyan:#4fd1c5; --slag:#6b7280;
+    --graphite:#080B10; --graphite-2:#11161D; --graphite-3:#171E27;
+    --line:#1F2833; --ash:#8A929D; --steel:#C7CDD4;
+    --ember:#00AEEF; --ember-2:#3BC8FF; --molten:#FFB547;
+    --cyan:#7DE2FF; --slag:#7D8896;
     --maxw:1180px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
@@ -26,8 +26,8 @@
   body::before{
     content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
     background:
-      radial-gradient(900px 600px at 85% -5%, rgba(255,90,31,.16), transparent 60%),
-      radial-gradient(700px 500px at -10% 110%, rgba(79,209,197,.08), transparent 60%);
+      radial-gradient(900px 600px at 85% -5%, rgba(0,174,239,.16), transparent 60%),
+      radial-gradient(700px 500px at -10% 110%, rgba(125,226,255,.08), transparent 60%);
   }
   body::after{
     content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.04;
@@ -44,7 +44,7 @@
   .brand{display:flex; align-items:center; gap:12px; font-family:'Anton',sans-serif;
     font-size:24px; letter-spacing:1px; text-transform:uppercase}
   .brand .spark{width:14px; height:14px; border-radius:50%;
-    background:radial-gradient(circle at 35% 30%, var(--molten), var(--ember) 60%, #7a1c00);
+    background:radial-gradient(circle at 35% 30%, var(--molten), var(--ember) 60%, #001a2e);
     box-shadow:0 0 18px var(--ember); animation:pulse 2.4s ease-in-out infinite}
   @keyframes pulse{0%,100%{box-shadow:0 0 10px var(--ember)}50%{box-shadow:0 0 26px var(--ember-2)}}
   .nav-links{display:flex; gap:30px; align-items:center; font-size:14px; font-weight:500}
@@ -53,8 +53,8 @@
   .btn{font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700;
     padding:11px 20px; border-radius:2px; text-transform:uppercase; letter-spacing:.5px;
     border:1px solid var(--ember); transition:.2s; cursor:pointer; display:inline-block}
-  .btn-ember{background:var(--ember); color:#120800}
-  .btn-ember:hover{background:var(--ember-2); box-shadow:0 0 24px rgba(255,90,31,.5)}
+  .btn-ember{background:var(--ember); color:#080B10}
+  .btn-ember:hover{background:var(--ember-2); box-shadow:0 0 24px rgba(0,174,239,.5)}
   .btn-ghost{background:transparent; color:var(--molten); border-color:var(--line)}
   .btn-ghost:hover{border-color:var(--ember); color:var(--ember-2)}
   @media(max-width:780px){.nav-links a:not(.btn){display:none}}
