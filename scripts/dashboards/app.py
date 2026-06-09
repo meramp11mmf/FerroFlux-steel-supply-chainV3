@@ -218,7 +218,7 @@ if page == "\U0001f3e0 Executive Dashboard":
 
     with c2:
         st.markdown("### Regional Demand")
-        reg = run_query("SELECT governate AS governorate, region, total_orders, total_revenue_egp, delay_pct FROM analytics.regional_demand ORDER BY total_revenue_egp DESC")
+        reg = run_query("SELECT governorate AS governorate, region, total_orders, total_revenue_egp, delay_pct FROM analytics.regional_demand ORDER BY total_revenue_egp DESC")
         fig = px.treemap(reg, path=['region', 'governorate'], values='total_revenue_egp', color='delay_pct', color_continuous_scale=['#00D084', '#FFB547', '#FF4D6D'], color_continuous_midpoint=reg['delay_pct'].median())
         fig.update_layout(height=400, margin=dict(l=0, r=0, t=30, b=0))
         fig = apply_dark_theme(fig)
@@ -387,7 +387,7 @@ elif page == "\U0001f4e6 Orders & Demand":
     with c1:
         st.markdown("### Revenue by Governorate (Top 15)")
         t15 = regional.head(15)
-        fig = go.Figure(go.Bar(x=t15['total_revenue_egp']/1e9, y=t15['governate'], orientation='h', marker=dict(color=t15['total_revenue_egp'], colorscale=[[0, '#11161D'], [1, '#00AEEF']]), text=(t15['total_revenue_egp']/1e9).round(1).astype(str) + 'B', textposition='outside', textfont=dict(color='#B6BEC8')))
+        fig = go.Figure(go.Bar(x=t15['total_revenue_egp']/1e9, y=t15['governorate'], orientation='h', marker=dict(color=t15['total_revenue_egp'], colorscale=[[0, '#11161D'], [1, '#00AEEF']]), text=(t15['total_revenue_egp']/1e9).round(1).astype(str) + 'B', textposition='outside', textfont=dict(color='#B6BEC8')))
         fig.update_layout(height=500, xaxis_title='Revenue (B EGP)')
         fig = apply_dark_theme(fig)
         st.plotly_chart(fig, use_container_width=True)
