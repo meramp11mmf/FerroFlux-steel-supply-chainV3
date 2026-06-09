@@ -10,14 +10,20 @@ DB_CONFIG = {
 }
 
 COLORS = {
-    "primary": "#1B4F72",
-    "secondary": "#2E86C1",
-    "accent": "#E74C3C",
-    "success": "#27AE60",
-    "warning": "#F39C12",
-    "dark": "#2C3E50",
-    "steel_blue": "#4A90D9",
-    "gold": "#D4AC0D",
+    "primary":   "#00AEEF",   # Electric Blue — accent
+    "secondary": "#C7CDD4",   # Steel Silver
+    "accent":    "#FF4D6D",   # Error / alert red
+    "success":   "#00D084",
+    "warning":   "#FFB547",
+    "dark":      "#080B10",
+    "card":      "#171E27",
+    "hover":     "#1F2833",
+    "chrome":    "#E5E8EC",
+    "gunmetal":  "#8A929D",
 }
 
-COLORS_SEQ = ['#1B4F72', '#2E86C1', '#4A90D9', '#76B5E8', '#AED6F1', '#D4AC0D', '#E74C3C', '#27AE60']
+COLORS_SEQ = [
+    "#00AEEF", "#3BC8FF", "#7DE2FF",
+    "#C7CDD4", "#8A929D", "#E5E8EC",
+    "#00D084", "#FFB547", "#FF4D6D",
+]
