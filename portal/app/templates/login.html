@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FerroFlux — Tenant Access</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Hanken+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --graphite:#0c0d0f; --graphite-2:#141619; --graphite-3:#1c1f24;
+    --line:#2a2e35; --ash:#8b93a1; --steel:#c9d2de; --slag:#6b7280;
+    --ember:#ff5a1f; --ember-2:#ff8a3d; --molten:#ffb347; --cyan:#4fd1c5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--graphite); color:var(--steel); font-family:'Hanken Grotesk',sans-serif;
+    min-height:100vh; display:grid; grid-template-columns:1.05fr .95fr; -webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .mono{font-family:'JetBrains Mono',monospace}
+
+  /* left brand panel */
+  .brandside{position:relative; padding:54px; display:flex; flex-direction:column; justify-content:space-between;
+    background:linear-gradient(160deg,#15100c,#0c0d0f 60%); border-right:1px solid var(--line); overflow:hidden}
+  .brandside::before{content:""; position:absolute; inset:0;
+    background:radial-gradient(600px 500px at 20% 10%, rgba(255,90,31,.2), transparent 60%)}
+  .brandside > *{position:relative; z-index:1}
+  .brand{display:flex; align-items:center; gap:12px; font-family:'Anton',sans-serif; font-size:26px;
+    text-transform:uppercase; letter-spacing:1px}
+  .spark{width:15px;height:15px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,var(--molten),var(--ember) 60%,#7a1c00);
+    box-shadow:0 0 22px var(--ember)}
+  .brandside h1{font-family:'Anton',sans-serif; font-weight:400; font-size:clamp(36px,4.5vw,60px);
+    text-transform:uppercase; line-height:.95; color:#fff; letter-spacing:-.5px; margin:18px 0}
+  .brandside h1 .hot{background:linear-gradient(100deg,var(--ember),var(--molten));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .brandside p{color:var(--ash); max-width:46ch; font-size:16px}
+  .feat{list-style:none; margin-top:26px}
+  .feat li{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--steel);
+    padding:9px 0; border-top:1px solid var(--line); display:flex; gap:10px}
+  .feat li::before{content:"▪"; color:var(--ember)}
+  .backlink{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--slag)}
+  .backlink a:hover{color:var(--molten)}
+
+  /* right form panel */
+  .formside{display:flex; align-items:center; justify-content:center; padding:40px}
+  .panel{width:100%; max-width:420px}
+  .tabs{display:flex; gap:4px; background:var(--graphite-2); border:1px solid var(--line);
+    border-radius:4px; padding:4px; margin-bottom:28px}
+  .tab{flex:1; text-align:center; padding:11px; font-family:'JetBrains Mono',monospace; font-size:13px;
+    font-weight:700; letter-spacing:.5px; text-transform:uppercase; border-radius:3px; cursor:pointer;
+    color:var(--ash); transition:.2s}
+  .tab.active{background:var(--ember); color:#120800}
+  h2{font-family:'Anton',sans-serif; font-weight:400; font-size:30px; text-transform:uppercase; color:#fff;
+    margin-bottom:6px}
+  .lead{color:var(--slag); font-size:14px; margin-bottom:24px}
+  label{display:block; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:1px;
+    text-transform:uppercase; color:var(--slag); margin:14px 0 6px}
+  input{width:100%; background:var(--graphite-2); border:1px solid var(--line); border-radius:3px;
+    padding:12px 14px; color:#fff; font-family:'Hanken Grotesk'; font-size:15px; transition:.2s}
+  input:focus{outline:none; border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,90,31,.12)}
+  .row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .btn{width:100%; margin-top:24px; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700;
+    padding:14px; border-radius:3px; text-transform:uppercase; letter-spacing:1px; border:none;
+    background:var(--ember); color:#120800; cursor:pointer; transition:.2s}
+  .btn:hover{background:var(--ember-2); box-shadow:0 0 26px rgba(255,90,31,.4)}
+  .btn:disabled{opacity:.6; cursor:wait}
+  .alt{margin-top:18px; text-align:center; font-size:13px; color:var(--slag)}
+  .alt a{color:var(--cyan)}
+  .msg{margin-top:18px; padding:13px 15px; border-radius:4px; font-size:13.5px; display:none}
+  .msg.err{display:block; background:rgba(255,90,31,.1); border:1px solid rgba(255,90,31,.4); color:var(--ember-2)}
+  .msg.ok{display:block; background:rgba(79,209,197,.08); border:1px solid rgba(79,209,197,.35); color:var(--cyan)}
+  .msg .mono{display:block; margin-top:6px; color:var(--steel); font-size:12.5px}
+  .demohint{margin-top:22px; padding:13px 15px; border:1px dashed var(--line); border-radius:4px;
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--slag)}
+  .demohint b{color:var(--molten)}
+  .hide{display:none}
+  @media(max-width:860px){body{grid-template-columns:1fr}.brandside{display:none}}
+</style>
+</head>
+<body>
+
+<aside class="brandside">
+  <a href="/" class="brand"><span class="spark"></span>FerroFlux</a>
+  <div>
+    <h1>Your factories.<br><span class="hot">Your data.</span><br>Yours alone.</h1>
+    <p>Every query in the tenant workspace is scoped to your company by a signed token — strict row-level isolation across the entire medallion stack.</p>
+    <ul class="feat">
+      <li>company_id isolation on every read</li>
+      <li>idempotent ON CONFLICT factory registration</li>
+      <li>validated Excel upload → your own Airflow run</li>
+    </ul>
+  </div>
+  <div class="backlink mono">← <a href="/">back to portfolio</a> &nbsp;·&nbsp; <a href="/demo">live demo</a></div>
+</aside>
+
+<main class="formside">
+  <div class="panel">
+    <div class="tabs">
+      <div class="tab active" id="tabLogin" onclick="show('login')">Sign In</div>
+      <div class="tab" id="tabReg" onclick="show('register')">Register</div>
+    </div>
+
+    <!-- LOGIN -->
+    <section id="loginForm">
+      <h2>Welcome back</h2>
+      <p class="lead">Sign in to your tenant workspace.</p>
+      <label>Username / Email</label>
+      <input id="lUser" autocomplete="username" placeholder="admin">
+      <label>Password</label>
+      <input id="lPass" type="password" autocomplete="current-password" placeholder="••••••••">
+      <button class="btn" id="loginBtn" onclick="doLogin()">Enter Workspace</button>
+      <div class="alt">No workspace yet? <a onclick="show('register')">Register your company →</a></div>
+      <div class="demohint">Demo login &nbsp;·&nbsp; <b>admin</b> / <b>admin123</b> &nbsp;— or <a class="mono" style="color:var(--cyan)" onclick="doDemo()">enter as guest</a></div>
+    </section>
+
+    <!-- REGISTER -->
+    <section id="registerForm" class="hide">
+      <h2>Onboard your company</h2>
+      <p class="lead">Spin up an isolated workspace in seconds.</p>
+      <label>Factory / Company Name</label>
+      <input id="rFactory" placeholder="Alexandria Steel Works">
+      <div class="row">
+        <div><label>Contact Name</label><input id="rContact" placeholder="Mona Hassan"></div>
+        <div><label>City</label><input id="rCity" placeholder="Alexandria"></div>
+      </div>
+      <div class="row">
+        <div><label>Email</label><input id="rEmail" type="email" placeholder="ops@asw.com"></div>
+        <div><label>Phone</label><input id="rPhone" placeholder="+20 100 000 0000"></div>
+      </div>
+      <button class="btn" id="regBtn" onclick="doRegister()">Create Workspace</button>
+      <div class="alt">Already onboarded? <a onclick="show('login')">Sign in →</a></div>
+    </section>
+
+    <div class="msg" id="msg"></div>
+  </div>
+</main>
+
+<script>
+function show(which){
+  const login = which==='login';
+  document.getElementById('loginForm').classList.toggle('hide', !login);
+  document.getElementById('registerForm').classList.toggle('hide', login);
+  document.getElementById('tabLogin').classList.toggle('active', login);
+  document.getElementById('tabReg').classList.toggle('active', !login);
+  hideMsg();
+}
+function msg(text, ok=false, extra=''){
+  const m=document.getElementById('msg');
+  m.className='msg '+(ok?'ok':'err');
+  m.innerHTML = text + (extra?('<span class="mono">'+extra+'</span>'):'');
+}
+function hideMsg(){document.getElementById('msg').className='msg';}
+
+function store(data){
+  // real server-served page: persist token + user for the SPA shell
+  localStorage.setItem('ff_token', data.token);
+  localStorage.setItem('ff_user', JSON.stringify(data.user||{}));
+}
+
+async function post(url, body){
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error((j && j.detail) ? (typeof j.detail==='string'?j.detail:JSON.stringify(j.detail)) : ('HTTP '+r.status));
+  return j;
+}
+
+async function doLogin(){
+  const btn=document.getElementById('loginBtn'); btn.disabled=true;
+  try{
+    const j = await post('/api/auth/login', {
+      username: document.getElementById('lUser').value.trim(),
+      password: document.getElementById('lPass').value
+    });
+    store(j);
+    msg('Signed in — loading your workspace…', true);
+    setTimeout(()=>location.href='/app', 500);
+  }catch(e){ msg('Login failed: '+e.message); btn.disabled=false; }
+}
+
+async function doDemo(){
+  try{
+    const r = await fetch('/api/auth/demo'); const j = await r.json();
+    store(j); location.href='/app';
+  }catch(e){ msg('Demo unavailable: '+e.message); }
+}
+
+async function doRegister(){
+  const btn=document.getElementById('regBtn'); btn.disabled=true;
+  try{
+    const j = await post('/api/auth/register', {
+      factory_name: document.getElementById('rFactory').value.trim(),
+      contact_name: document.getElementById('rContact').value.trim(),
+      email:        document.getElementById('rEmail').value.trim(),
+      phone:        document.getElementById('rPhone').value.trim(),
+      city:         document.getElementById('rCity').value.trim()
+    });
+    msg('Workspace created. Sign in with the credentials below:', true,
+        'username: '+j.login_username+'  ·  password: '+j.temp_password);
+    document.getElementById('lUser').value = j.login_username;
+    setTimeout(()=>show('login'), 2600);
+  }catch(e){ msg('Registration failed: '+e.message); }
+  finally{ btn.disabled=false; }
+}
+
+// allow Enter to submit login
+document.getElementById('lPass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+</script>
+</body>
+</html>

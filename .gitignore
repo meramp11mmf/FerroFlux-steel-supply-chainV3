@@ -1,0 +1,39 @@
+# ── Sensitive credentials ─────────────────────────────────────
+.env
+
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Data & logs ───────────────────────────────────────────────
+data/
+logs/
+*.log
+*.csv
+*.parquet
+
+# ── DB dump (too large for git, use separately) ───────────────
+*.sql
+
+# ── Docker volumes (if mapped locally) ───────────────────────
+postgres_data/
+airflow_logs/
+airflow_plugins/
+
+# ── OS files ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDEs ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo

@@ -1,0 +1,98 @@
+# ============================================================
+# docker-compose.override.yml — FerroFlux V3 refactor
+# ============================================================
+# Compose automatically merges this on top of docker-compose.yml
+# (`docker compose up` reads both). It does three things:
+#
+#   1. Re-points steel-portal at the new dedicated portal/Dockerfile
+#      (the base compose built it off the Airflow `Dockerfile` with no
+#      run command, so the container had no working entrypoint).
+#   2. Fixes the DATABASE_URL password mismatch — the base file used
+#      `steel_pass`, but Postgres / the ETL use `steel_pass_2024`
+#      (POSTGRES_PASSWORD in .env). Now both sides agree.
+#   3. Adds the missing `n8n` automation service, and wires the
+#      N8N_WEBHOOK_URL into the portal and Spark so anomaly alerts flow.
+#
+# Apply with:  docker compose up -d --build
+# ============================================================
+
+services:
+
+  # ---- portal: real build + corrected env ----
+  steel-portal:
+    build:
+      context: ./portal          # build context is the portal folder
+      dockerfile: Dockerfile     # portal/Dockerfile (uvicorn entrypoint)
+    environment:
+      # FIX: password now matches POSTGRES_PASSWORD (steel_pass_2024)
+      - DATABASE_URL=postgresql://steel_admin:steel_pass_2024@steel-postgres:5432/steel_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - AIRFLOW_BASE_URL=http://airflow-webserver:8080/api/v1
+      - AIRFLOW_USER=admin
+      - AIRFLOW_PASSWORD=admin123
+      - ETL_DAG_ID=steel_production_etl
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/steel-alert
+      # change this in any real deployment — signs tenant tokens
+      - PORTAL_SECRET_KEY=${PORTAL_SECRET_KEY:-change-me-in-production}
+      - ADMIN_USER=admin
+      - ADMIN_PASS=admin123
+    volumes:
+      # live-mount source for dev reloads; drop this in production so the
+      # image's baked-in code (COPY app) is what runs.
+      - ./portal:/app
+      - ./data:/app/data
+    depends_on:
+      steel-postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - steel-network
+
+  # ---- Spark gets the webhook URL so Silver/Gold can emit anomalies ----
+  spark-master:
+    environment:
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/steel-alert
+      - PG_HOST=steel-postgres
+      - PG_PORT=5432
+      - PG_DB=steel_db
+      - PG_USER=steel_admin
+      - PG_PASSWORD=steel_pass_2024
+
+  spark-worker:
+    environment:
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/steel-alert
+      - PG_HOST=steel-postgres
+      - PG_PORT=5432
+      - PG_DB=steel_db
+      - PG_USER=steel_admin
+      - PG_PASSWORD=steel_pass_2024
+
+  # ---- NEW: n8n automation engine (was named in the spec, absent from compose) ----
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=n8n
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      # webhooks are called by other containers via the service name
+      - WEBHOOK_URL=http://n8n:5678/
+      - GENERIC_TIMEZONE=Africa/Cairo
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_RUNNERS_ENABLED=true
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # mount the workflow JSON for easy manual import in the UI
+      - ./n8n:/workflows:ro
+    depends_on:
+      kafka:
+        condition: service_started
+    networks:
+      - steel-network
+
+volumes:
+  n8n_data:

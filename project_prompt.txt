@@ -1,0 +1,402 @@
+================================================================
+GRADUATION PROJECT: Big Data Analytics for Egyptian Steel Supply Chain
+================================================================
+
+## PROJECT OVERVIEW:
+- Big Data Pipeline for Egyptian Steel Supply Chain
+- Tech Stack: Docker, Kafka, Spark, PostgreSQL, Airflow, ML, Dashboard
+- OS: Windows (PowerShell)
+- Path: C:\Users\Admin\Desktop\steel-supply-chain
+- Python: 3.11 on Windows, kafka-python 2.3.1 installed
+
+================================================================
+## ARCHITECTURE: BATCH + STREAMING (DUAL PATH)
+================================================================
+
+BATCH PATH:  CSV Files --> Spark Batch ETL (Bronze/Silver/Gold) --> PostgreSQL --> ML Models
+STREAM PATH: Kafka Producers --> Kafka Topics --> Spark Streaming --> PostgreSQL --> Dashboard
+
+Batch = Historical (86,044 records, 2 years, run once/daily)
+Stream = Real-time (4 Kafka topics, simulated live data)
+
+================================================================
+## FOLDER STRUCTURE:
+================================================================
+
+steel-supply-chain/
++-- dags/
++-- dashboards/
++-- data/
+|   +-- raw/
+|   |   +-- market_data.csv        (730 rows)
+|   |   +-- orders.csv             (28,393 rows)
+|   |   +-- production.csv         (27,522 rows)
+|   |   +-- shipments.csv          (27,225 rows)
+|   |   +-- raw_materials.csv      (2,174 rows)
+|   |   +-- real_data/
+|   |       +-- brent_oil.csv
+|   |       +-- ezz_steel_stock.csv
+|   |       +-- mining_etf_pick.csv
+|   |       +-- natural_gas.csv
+|   |       +-- steel_etf_slx.csv
+|   |       +-- usd_egp_yahoo.csv
+|   |       +-- world_bank_commodities.xlsx
+|   +-- processed/
++-- data_collectors/
++-- data_generators/
++-- docs/
++-- kafka/
++-- kafka_producers/
+|   +-- config.py
+|   +-- market_producer.py
+|   +-- orders_producer.py
+|   +-- production_producer.py
+|   +-- shipments_producer.py
+|   +-- verify_topics.py
++-- logs/
++-- ml_jobs/
++-- scripts/
++-- spark_jobs/
++-- docker-compose.yml
++-- Dockerfile
++-- init_db.sql
++-- requirements.txt
+
+================================================================
+## CSV COLUMN NAMES (EXACT):
+================================================================
+
+### market_data.csv (730 rows - daily prices for 2 years):
+date, steel_price_egypt_egp, iron_ore_price_usd, scrap_price_usd,
+usd_egp_rate, natural_gas_price_usd, brent_oil_usd,
+electricity_price_egp_kwh, seasonality_index, is_ramadan
+
+### orders.csv (28,393 rows - ~40 orders/day x 730 days):
+order_id, order_date, customer_id, customer_type, product_type,
+rebar_size_mm, quantity_tons, price_per_ton_egp, total_value_egp,
+delivery_governorate, expected_delivery, actual_delivery, delay_days,
+is_delayed, payment_terms, status
+
+Customer types: government_mega_project(12%), private_contractor(20%),
+distributor(30%), small_contractor(18%), industrial_manufacturer(8%), export(12%)
+Products: rebar_10/12/16/20/25mm, wire_rod, HRC, CRC
+24 governorates, status: delivered(96%)/cancelled(4%)
+
+### production.csv (27,522 rows - 13 lines x 3 shifts x 730 days):
+batch_id, date, facility, production_line, line_type, product_type,
+shift, planned_tons, actual_tons, waste_tons, yield_loss_pct,
+efficiency_pct, energy_kwh, natural_gas_m3, quality_score, status
+
+Facilities: ALEX(Alexandria), SUEZ, SADAT
+13 lines: ALEX_DRI_01/02, ALEX_EAF_01/02, ALEX_RM_01/02,
+          SUEZ_DRI_01, SUEZ_EAF_01, SUEZ_HSM_01, SUEZ_CRM_01,
+          SADAT_EAF_01, SADAT_RM_01/02
+Line types: DRI, EAF, Rolling_Mill, Hot_Strip_Mill, Cold_Rolling
+Shifts: morning(92% eff), afternoon(87%), night(83%), maintenance, power_outage
+Products: sponge_iron, billets, rebar, HRC, CRC, wire_rod
+
+### shipments.csv (27,225 rows - one per delivered order):
+shipment_id, order_id, origin, destination, distance_km,
+transport_mode, num_trucks, weight_tons, transport_cost_egp,
+cost_per_ton_km_egp, fuel_liters, co2_emissions_kg, departure_date,
+arrival_date, delay_days, port_delay_days, status, carrier
+
+99% truck, 1% rail. 1 truck = 25 tons.
+Cost: 2.50-4.50 EGP/ton-km
+8 carriers: Nile_Logistics, Egyptian_Transport, Delta_Freight, etc.
+
+### raw_materials.csv (2,174 rows - purchases from 12 suppliers):
+purchase_id, material_type, supplier_name, origin_country,
+quantity_tons, price_per_ton_usd, ocean_freight_usd_per_ton,
+total_material_cost_usd, total_freight_cost_usd, total_landed_cost_usd,
+purchase_date, expected_delivery, actual_delivery, discharge_port,
+quality_grade, on_time, supplier_reliability, dri_scrap_ratio
+
+Materials: iron_ore(80%), scrap(20%), coal, limestone, graphite_electrodes
+Suppliers: Vale_SA(Brazil), Rio_Tinto(Australia), BHP(Australia),
+           FMG(Australia), Local_Scrap_Cairo/Alex/Delta(Egypt),
+           Turkish_HMS(Turkey), European_Scrap(Europe),
+           Coal_India(India), Limestone_Egypt(Egypt), Electrode_China(China)
+Ports: Ain_Sokhna(Red Sea), Dekheila(Mediterranean)
+DRI:Scrap ratio = 80:20
+
+================================================================
+## DOCKER COMPOSE - 12 CONTAINERS:
+================================================================
+
+1.  zookeeper          - confluentinc/cp-zookeeper:7.4.0  (port 2181)
+2.  kafka              - confluentinc/cp-kafka:7.4.0      (port 9092 ext, 29092 int)
+3.  kafka-ui           - provectuslabs/kafka-ui:latest     (port 8083)
+4.  kafka-producer     - python:3.9-slim
+5.  spark-master       - apache/spark:3.4.4-python3       (ports 9090, 7077)
+6.  spark-worker       - apache/spark:3.4.4-python3       (port 9091)
+7.  airflow-postgres   - postgres:13                       (port 5433)
+8.  airflow-redis      - redis:7-alpine                    (port 6379)
+9.  airflow-init       - custom Dockerfile (airflow:2.8.0-python3.9)
+10. airflow-webserver  - custom Dockerfile                 (port 8082)
+11. airflow-scheduler  - custom Dockerfile
+12. steel-postgres     - postgres:13                       (port 5432)
+
+Network: steel-network (bridge)
+Volumes: airflow_postgres_data, steel_postgres_data
+
+Spark volumes:
+  ./spark_jobs:/opt/spark/spark_jobs
+  ./data:/opt/spark/data
+  ./ml_jobs:/opt/spark/ml_jobs
+  ./scripts:/opt/spark/scripts
+
+Airflow volumes:
+  ./dags:/opt/airflow/dags
+  ./logs:/opt/airflow/logs
+  ./scripts:/opt/airflow/scripts
+  ./data:/opt/airflow/data
+
+================================================================
+## KAFKA CONFIG (DUAL LISTENER - CRITICAL):
+================================================================
+
+KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+- From Windows (Python/PowerShell): localhost:9092
+- From Docker containers (Spark/Airflow): kafka:29092
+- Kafka UI uses: kafka:29092
+
+## KAFKA TOPICS (4 topics, 3 partitions each):
+1. steel_market_prices  (market_producer.py  - every 5s,  batch 1)
+2. steel_orders         (orders_producer.py  - every 10s, batch 5)
+3. steel_production     (production_producer.py - every 15s, batch 3)
+4. steel_shipments      (shipments_producer.py - every 20s, batch 2)
+
+================================================================
+## DATABASE CREDENTIALS:
+================================================================
+
+### Steel DB:
+- Host: localhost:5432 (Windows) / steel-postgres:5432 (Docker)
+- User: steel_admin
+- Password: steel_pass_2024
+- Database: steel_db
+
+### Airflow DB:
+- Host: localhost:5433 / airflow-postgres:5432
+- User: airflow / Password: airflow
+
+### Airflow Web UI:
+- URL: http://localhost:8082
+- User: admin / Password: admin123
+
+================================================================
+## COMPLETED WORK:
+================================================================
+
+### Day 1 - DONE:
+1. Project folder structure
+2. Data Generation - 5 CSV files (86,044 records)
+3. Real Data from APIs (brent_oil, ezz_steel, natural_gas, usd_egp, etc.)
+4. Docker Compose - 12 containers configured
+5. Data validated
+
+### Day 2 - DONE:
+1. Kafka dual-listener configured (internal + external)
+2. 4 Kafka topics created (3 partitions each)
+3. kafka_producers/ folder with 6 files (config + 4 producers + verify)
+4. All 4 producers tested and verified working
+5. kafka-python 2.3.1 installed
+
+================================================================
+## SPARK BATCH ETL PLAN (Day 3 - NEXT):
+================================================================
+
+### Bronze Layer (Raw to Parquet):
+- Read 5 CSVs from data/raw/
+- Basic validation, no changes
+- Save as Parquet in data/processed/bronze/
+- Load into PostgreSQL schema: raw_data
+  Tables: raw_data.market_prices, raw_data.production,
+          raw_data.orders, raw_data.shipments, raw_data.raw_materials
+
+### Silver Layer (Clean + Transform):
+- market_data: add price_change_pct, moving_avg_7d, moving_avg_30d,
+               price_volatility, is_price_spike, merge real API data
+- production: add net_output, energy_per_ton, cost_estimate, shift_rank,
+              join with market_data for energy prices
+- orders: add is_large_order, region classification, delivery_performance_score,
+          revenue_per_customer, join with market_data
+- shipments: add cost_per_ton, delivery_speed, is_efficient, carbon_per_ton,
+             join with orders
+- raw_materials: add total_cost_egp, days_late, supplier_score,
+                 landed_cost_with_fx, join with market_data for fx rate
+- Save in data/processed/silver/
+- Load into PostgreSQL schema: processed_data
+
+### Gold Layer (Aggregated KPIs):
+- TABLE 1: daily_kpis (1 row/day)
+  date, total_production_tons, avg_efficiency, total_orders,
+  total_revenue, on_time_delivery_pct, steel_price, usd_egp_rate, profit_estimate
+
+- TABLE 2: monthly_summary (1 row/month)
+  month, total_production, total_revenue, total_raw_material_cost,
+  total_logistics_cost, gross_margin, top_products
+
+- TABLE 3: supplier_scorecard (1 row/supplier)
+  supplier_name, total_orders, avg_lead_time, on_time_pct,
+  avg_quality, avg_price, risk_score
+
+- TABLE 4: regional_demand (1 row/governorate)
+  governorate, total_orders, total_tons, total_revenue,
+  avg_delivery_time, delay_pct, top_customer_type
+
+- TABLE 5: production_efficiency (1 row/production_line)
+  production_line, facility, avg_efficiency, total_output,
+  avg_waste_pct, energy_per_ton, best_shift
+
+- TABLE 6: price_features (1 row/day - for ML)
+  date, steel_price(target), iron_ore, usd_egp, brent_oil, gas_price,
+  seasonality, is_ramadan, price_lag_7d, price_lag_30d, moving_avg_7d,
+  price_change_pct
+
+- Save in data/processed/gold/
+- Load into PostgreSQL schema: analytics
+
+================================================================
+## ML MODELS PLAN (Day 5-6):
+================================================================
+
+Model 1: Steel Price Prediction (XGBoost)
+- Input: analytics.price_features (730 days)
+- Train on 700 days, test on 30
+- Output: 7-day and 30-day price forecast
+- Features: iron_ore, usd_egp, oil, gas, seasonality, lags, moving_avgs
+- Business value: 5-8% savings on raw materials
+
+Model 2: Demand Forecasting (Prophet/XGBoost)
+- Input: analytics.daily_kpis + processed_data.orders_clean
+- Output: Weekly demand by region and product
+- Features: governorate, product_type, seasonality, month, prices
+- Business value: 15-20% inventory reduction
+
+Model 3: Supplier Risk Scoring (Random Forest)
+- Input: analytics.supplier_scorecard + processed_data.rawmat_clean
+- Output: Risk score 0-100 per supplier
+- Features: on_time_rate, quality_grade, lead_time, price_volatility, country
+- Business value: supply chain resilience
+
+================================================================
+## SPARK STREAMING PLAN (Day 4):
+================================================================
+
+Read from 4 Kafka topics using Spark Structured Streaming:
+1. Price Monitoring: detect >5% price spikes, calculate 5-min moving avg
+2. Order Tracking: flag large orders >1000 tons, hourly order summaries
+3. Production Monitoring: alert if efficiency <70%, detect power outages
+4. Shipment Tracking: flag delayed shipments, count active shipments
+
+Output to PostgreSQL:
+- streaming.price_alerts
+- streaming.order_summary
+- streaming.production_live
+- streaming.shipment_status
+
+================================================================
+## AIRFLOW DAG PLAN (Day 7):
+================================================================
+
+DAG: steel_supply_chain_daily (Schedule: 6 AM daily)
+Task 1: Collect fresh data from APIs (USD, oil, gas, steel prices)
+Task 2: Validate data (no nulls, values in range)
+Task 3: Spark ETL (Bronze -> Silver -> Gold)
+Task 4: Update KPIs in PostgreSQL
+Task 5: Retrain ML models (weekly)
+Task 6: Refresh dashboard, send alerts
+
+================================================================
+## DASHBOARD PLAN (Day 8 - Streamlit/Plotly):
+================================================================
+
+Page 1: Market Overview - steel price chart, USD trend, price prediction
+Page 2: Production - daily output by line, efficiency, energy consumption
+Page 3: Orders and Demand - orders by region map, demand forecast
+Page 4: Logistics - delivery performance, cost analysis, CO2 emissions
+Page 5: Procurement - supplier scorecard, risk alerts, price trends
+
+================================================================
+## POSTGRESQL SCHEMAS:
+================================================================
+
+Schema 1: raw_data (Bronze)
+- market_prices, production, orders, shipments, raw_materials
+
+Schema 2: processed_data (Silver)
+- market_clean, production_clean, orders_clean, shipments_clean, rawmat_clean
+
+Schema 3: analytics (Gold)
+- daily_kpis, monthly_summary, supplier_scorecard,
+  regional_demand, production_efficiency, price_features
+
+Schema 4: streaming (Real-time)
+- price_alerts, order_summary, production_live, shipment_status
+
+Schema 5: ml_models (ML results)
+- price_predictions, demand_forecasts, supplier_risk_scores
+
+================================================================
+## DOCKERFILE (for Airflow):
+================================================================
+
+FROM apache/airflow:2.8.0-python3.9
+USER root
+RUN apt-get update and apt-get install -y gcc python3-dev
+USER airflow
+RUN pip install kafka-python==2.0.2 psycopg2-binary==2.9.9
+    pandas==2.1.4 numpy==1.26.2 scikit-learn==1.3.2 xgboost==2.0.3
+    apache-airflow-providers-postgres==5.10.0
+    apache-airflow-providers-apache-spark==4.7.1
+
+================================================================
+## DATA RELATIONSHIPS:
+================================================================
+
+market_data (prices) ---> affects ---> orders (price_per_ton)
+market_data (fx rate) ---> affects ---> raw_materials (cost in EGP)
+raw_materials (input) ---> feeds ---> production (output)
+production (output) ---> fulfills ---> orders (products)
+orders (delivered) ---> creates ---> shipments (logistics)
+real_data (APIs) ---> validates ---> market_data (accuracy)
+
+================================================================
+## IMPORTANT NOTES FOR CONTINUATION:
+================================================================
+
+1.  Windows PowerShell - commands must be PS compatible
+2.  Use Set-Content with @' '@ for creating Python files
+3.  Copy-paste one command at a time (user needs step by step)
+4.  Do NOT include "PS C:\...>" prefix in commands
+5.  All containers on network: steel-network
+6.  Kafka external: localhost:9092, internal: kafka:29092
+7.  Data files in data/raw/ NOT data/
+8.  Use exact CSV column names listed above
+9.  Step-by-step instructions in Arabic
+10. kafka-python 2.3.1 on Windows Python 3.11
+11. Spark image: apache/spark:3.4.4-python3 (NOT bitnami)
+12. Spark master URL: spark://spark-master:7077
+13. init_db.sql exists at project root
+14. Spark jobs should be placed in ./spark_jobs/ (mounted to /opt/spark/spark_jobs)
+15. For Spark inside Docker, data path is /opt/spark/data/raw/
+16. For Python on Windows, data path is C:/Users/Admin/Desktop/steel-supply-chain/data/raw/
+
+================================================================
+## HOW TO RESUME IN NEW CHAT:
+================================================================
+
+1. Copy this entire file content
+2. Paste in new chat
+3. Say: "I need to continue my graduation project from [STEP NAME]"
+4. Add: "All project info is above. I am on Windows PowerShell."
+5. Add: "Step by step instructions in Arabic please."
+6. Path: C:\Users\Admin\Desktop\steel-supply-chain
+
+================================================================

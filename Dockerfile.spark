@@ -1,0 +1,33 @@
+FROM apache/spark:3.4.4-python3
+
+USER root
+
+ENV SPARK_HOME=/opt/spark
+ENV PYTHONPATH=/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip
+
+RUN mkdir -p /opt/spark/logs /opt/spark/work /opt/spark/data /opt/spark/jars && \
+    chmod -R 777 /opt/spark/data && \
+    chown -R spark:spark /opt/spark
+
+RUN pip install --no-cache-dir \
+    kafka-python==2.0.2 \
+    pandas==2.0.3 \
+    psycopg2-binary==2.9.9 \
+    sqlalchemy==2.0.23 \
+    streamlit==1.29.0 \
+    matplotlib==3.7.2 \
+    seaborn==0.12.2 \
+    plotly==5.18.0
+
+RUN wget -q https://jdbc.postgresql.org/download/postgresql-42.7.1.jar -P /opt/spark/jars/ && \
+    wget -q https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.4.4/spark-sql-kafka-0-10_2.12-3.4.4.jar -P /opt/spark/jars/ && \
+    wget -q https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.12/3.4.4/spark-token-provider-kafka-0-10_2.12-3.4.4.jar -P /opt/spark/jars/ && \
+    wget -q https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.3.2/kafka-clients-3.3.2.jar -P /opt/spark/jars/ && \
+    wget -q https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar -P /opt/spark/jars/ && \
+    chown -R spark:spark /opt/spark/jars
+
+USER spark
+WORKDIR /opt/spark
+
+ENTRYPOINT ["/opt/entrypoint.sh"]
+CMD ["tail", "-f", "/dev/null"]

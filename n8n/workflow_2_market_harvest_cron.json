@@ -1,0 +1,77 @@
+{
+  "name": "FerroFlux · Workflow 2 — Daily Market Harvest → Kafka",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 6 * * *" }
+          ]
+        }
+      },
+      "id": "cron",
+      "name": "Daily 06:00 Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 360],
+      "notes": "Fires once a day at 06:00 server time. Adjust cron as needed."
+    },
+    {
+      "parameters": {
+        "url": "https://api.example-steel-index.com/v1/spot",
+        "method": "GET",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "market", "value": "egypt" },
+            { "name": "metrics", "value": "rebar,billet,iron_ore,scrap,coking_coal" }
+          ]
+        },
+        "options": { "timeout": 15000, "response": { "response": { "neverError": false } } }
+      },
+      "id": "fetch",
+      "name": "Fetch Steel Indices",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 360],
+      "notes": "Replace URL + credential with your real steel-index / spot-price provider. Returns raw JSON quotes."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Scrub & structure the external feed into the schema Spark Structured\n// Streaming expects on the `steel_market_prices` topic.\n// Output one Kafka-ready message per item.\nconst today = new Date().toISOString().slice(0, 10);\nconst out = [];\n\nfor (const item of $input.all()) {\n  const src = item.json || {};\n  // Defensive extraction with fallbacks; coerce to numbers.\n  const num = (v, d = null) => {\n    const n = Number(v);\n    return Number.isFinite(n) ? n : d;\n  };\n\n  const record = {\n    date: src.date || today,\n    steel_price_egypt_egp: num(src.rebar_egp ?? src.rebar?.egp),\n    iron_ore_price_usd:    num(src.iron_ore_usd ?? src.iron_ore?.usd),\n    scrap_price_usd:       num(src.scrap_usd ?? src.scrap?.usd),\n    coking_coal_price_usd: num(src.coking_coal_usd ?? src.coking_coal?.usd),\n    billet_price_usd:      num(src.billet_usd ?? src.billet?.usd),\n    usd_egp_rate:          num(src.usd_egp ?? src.fx?.usd_egp),\n    source: src.source || 'example-steel-index',\n    harvested_at: new Date().toISOString()\n  };\n\n  // Drop the message if the core price is missing — never publish garbage.\n  if (record.steel_price_egypt_egp === null && record.iron_ore_price_usd === null) {\n    continue;\n  }\n  out.push({ json: record });\n}\n\nif (out.length === 0) {\n  // Surface an empty harvest as an error so the run is visibly failed.\n  throw new Error('Market harvest produced no valid records — upstream feed may be down.');\n}\nreturn out;"
+      },
+      "id": "scrub",
+      "name": "Scrub & Structure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 360],
+      "notes": "Normalizes provider fields → market_clean-compatible schema and rejects empty/garbage payloads."
+    },
+    {
+      "parameters": {
+        "topic": "steel_market_prices",
+        "sendInputData": false,
+        "message": "={{ JSON.stringify($json) }}",
+        "jsonParameters": false,
+        "options": {
+          "acks": 1,
+          "compression": false
+        }
+      },
+      "id": "kafka",
+      "name": "Publish → Kafka (steel_market_prices)",
+      "type": "n8n-nodes-base.kafka",
+      "typeVersion": 1,
+      "position": [980, 360],
+      "notes": "Kafka credential: broker = kafka:29092 (inside steel-network), clientId = n8n-market-harvest. Topic steel_market_prices is consumed by Spark Structured Streaming (streaming_etl.py)."
+    }
+  ],
+  "connections": {
+    "Daily 06:00 Trigger": { "main": [[{ "node": "Fetch Steel Indices", "type": "main", "index": 0 }]] },
+    "Fetch Steel Indices": { "main": [[{ "node": "Scrub & Structure", "type": "main", "index": 0 }]] },
+    "Scrub & Structure":   { "main": [[{ "node": "Publish → Kafka (steel_market_prices)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true },
+  "tags": [{ "name": "ferroflux" }, { "name": "ingestion" }]
+}

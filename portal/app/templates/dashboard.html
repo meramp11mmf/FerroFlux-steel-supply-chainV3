@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FerroFlux — Tenant Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --g0:#0c0d0f;--g1:#141619;--g2:#1c1f24;--g3:#23272e;
+  --line:#2a2e35;--ash:#8b93a1;--steel:#c9d2de;--slag:#6b7280;
+  --ember:#ff5a1f;--ember2:#ff8a3d;--molten:#ffb347;--cyan:#4fd1c5;--purple:#9b8cff;
+  --sidebar:230px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--g0);color:var(--steel);font-family:'Hanken Grotesk',sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 800px 500px at 95% -5%,rgba(255,90,31,.09),transparent 65%)}
+a{color:inherit;text-decoration:none}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ─── LAYOUT ─── */
+.app{display:grid;grid-template-columns:var(--sidebar) 1fr;min-height:100vh;position:relative;z-index:1}
+
+/* ─── SIDEBAR ─── */
+aside{background:var(--g1);border-right:1px solid var(--line);padding:22px 16px;
+  position:sticky;top:0;height:100vh;display:flex;flex-direction:column;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:10px;font-family:'Anton',sans-serif;font-size:20px;
+  text-transform:uppercase;letter-spacing:1px;color:#fff;padding:0 6px 20px;
+  border-bottom:1px solid var(--line)}
+.spark{width:13px;height:13px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,var(--molten),var(--ember) 60%,#7a1c00);
+  box-shadow:0 0 16px var(--ember)}
+nav.menu{margin-top:18px;display:flex;flex-direction:column;gap:2px;flex:1}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:4px;
+  cursor:pointer;font-size:13.5px;font-weight:500;color:var(--ash);transition:.15s}
+.nav-item:hover{background:var(--g2);color:var(--steel)}
+.nav-item.active{background:rgba(255,90,31,.11);color:var(--ember2)}
+.nav-item .ic{width:17px;text-align:center;font-family:'JetBrains Mono';font-size:13px}
+.sidebar-section{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:2px;
+  text-transform:uppercase;color:var(--slag);padding:14px 12px 6px;margin-top:4px}
+.tenant-box{border-top:1px solid var(--line);padding-top:14px;margin-top:auto}
+.tenant-box .cn{font-size:13px;color:#fff;font-weight:700;font-family:'JetBrains Mono'}
+.tenant-box .ci{font-size:10.5px;color:var(--slag);margin-top:3px;font-family:'JetBrains Mono'}
+.tenant-box .fx{font-size:10.5px;color:var(--cyan);margin-top:6px;font-family:'JetBrains Mono'}
+.logout{margin-top:12px;font-size:12px;color:var(--slag);cursor:pointer;font-family:'JetBrains Mono'}
+.logout:hover{color:var(--ember2)}
+
+/* ─── MAIN ─── */
+main{padding:28px 36px 60px;overflow-x:hidden;min-width:0}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;gap:12px}
+.topbar h1{font-family:'Anton',sans-serif;font-weight:400;font-size:38px;
+  text-transform:uppercase;color:#fff;line-height:1;letter-spacing:-.5px}
+.topbar .sub{color:var(--slag);font-size:12.5px;font-family:'JetBrains Mono';margin-top:7px}
+.badge-alert{font-family:'JetBrains Mono';font-size:11.5px;padding:8px 14px;border-radius:20px;
+  border:1px solid rgba(255,90,31,.4);background:rgba(255,90,31,.10);color:var(--ember2);white-space:nowrap}
+
+/* ─── VIEW TRANSITIONS ─── */
+.view{display:none}
+.view.active{display:block;animation:fade .28s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ─── ALERT BANNER ─── */
+.alert-banner{display:flex;align-items:center;gap:12px;border-radius:4px;padding:11px 16px;
+  margin-bottom:18px;font-family:'JetBrains Mono',monospace;font-size:12px}
+.alert-banner.warn{background:rgba(255,90,31,.09);border:1px solid rgba(255,90,31,.33);color:var(--ember2)}
+.alert-banner.ok{background:rgba(79,209,197,.07);border:1px solid rgba(79,209,197,.26);color:var(--cyan)}
+.alert-banner.hidden{display:none}
+
+/* ─── KPI CARDS ─── */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:18px}
+.kpi{background:var(--g1);border:1px solid var(--line);border-radius:5px;padding:18px 20px;
+  position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ember)}
+.kpi.c2::before{background:var(--cyan)}.kpi.c3::before{background:var(--molten)}.kpi.c4::before{background:var(--purple)}
+.kpi .lbl{font-family:'JetBrains Mono';font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--slag)}
+.kpi .val{font-family:'Anton';font-size:30px;color:#fff;margin-top:8px;line-height:1}
+.kpi .unit{font-size:12px;color:var(--ash);font-family:'Hanken Grotesk'}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* ─── PANELS ─── */
+.row2{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-bottom:14px}
+.row2-eq{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.row-full{margin-bottom:14px}
+.panel{background:var(--g1);border:1px solid var(--line);border-radius:5px;padding:20px 22px}
+.panel-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3px}
+.panel-hd h3{font-family:'JetBrains Mono';font-size:12px;text-transform:uppercase;
+  letter-spacing:1.3px;color:var(--steel)}
+.panel-sub{font-size:12px;color:var(--slag);margin-bottom:14px}
+.cv{position:relative}
+.cv.h260{height:260px}.cv.h220{height:220px}.cv.h200{height:200px}
+@media(max-width:1100px){.row2,.row2-eq{grid-template-columns:1fr}}
+
+/* ─── TABLE ─── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-family:'JetBrains Mono';font-size:9.5px;text-transform:uppercase;letter-spacing:1.1px;
+  color:var(--slag);text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid rgba(42,46,53,.45);color:var(--steel)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--g2)}
+.tag{font-family:'JetBrains Mono';font-size:10.5px;padding:2px 8px;border-radius:3px}
+.risk-hi{background:rgba(255,90,31,.14);color:var(--ember2)}
+.risk-md{background:rgba(255,179,71,.12);color:var(--molten)}
+.risk-lo{background:rgba(79,209,197,.11);color:var(--cyan)}
+.empty-state{padding:36px;text-align:center;color:var(--slag);font-family:'JetBrains Mono';font-size:12.5px}
+.loading{padding:40px;text-align:center;color:var(--slag);font-family:'JetBrains Mono';font-size:12px}
+
+/* ─── FORMS ─── */
+label{display:block;font-family:'JetBrains Mono';font-size:10px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--slag);margin:13px 0 5px}
+input,select{width:100%;background:var(--g2);border:1px solid var(--line);border-radius:3px;
+  padding:10px 12px;color:#fff;font-family:'Hanken Grotesk';font-size:14px}
+input:focus,select:focus{outline:none;border-color:var(--ember)}
+.btn{font-family:'JetBrains Mono';font-size:12px;font-weight:700;padding:11px 20px;border-radius:3px;
+  text-transform:uppercase;letter-spacing:.6px;border:none;background:var(--ember);color:#120800;
+  cursor:pointer;transition:.18s;margin-top:18px}
+.btn:hover{background:var(--ember2)}.btn:disabled{opacity:.6;cursor:wait}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--molten)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.uploadtypes{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:6px}
+.utype{border:1px solid var(--line);border-radius:4px;padding:13px 9px;text-align:center;
+  cursor:pointer;transition:.15s;background:var(--g2)}
+.utype.active{border-color:var(--ember);background:rgba(255,90,31,.10)}
+.utype .un{font-family:'JetBrains Mono';font-size:11px;color:#fff}
+.utype .ud{font-size:10px;color:var(--slag);margin-top:2px}
+@media(max-width:980px){.uploadtypes{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+.toast{position:fixed;bottom:24px;right:24px;max-width:360px;padding:13px 17px;border-radius:5px;
+  font-size:13px;font-family:'JetBrains Mono';z-index:99;transform:translateY(120%);transition:.28s;opacity:0}
+.toast.show{transform:none;opacity:1}
+.toast.ok{background:#0e211a;border:1px solid rgba(79,209,197,.4);color:var(--cyan)}
+.toast.err{background:#261008;border:1px solid rgba(255,90,31,.4);color:var(--ember2)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ─── SIDEBAR ─── -->
+<aside>
+  <div class="brand"><span class="spark"></span>FerroFlux</div>
+  <nav class="menu">
+    <div class="sidebar-section">Analytics</div>
+    <div class="nav-item active" data-view="overview"><span class="ic">◧</span>Overview</div>
+    <div class="nav-item" data-view="production"><span class="ic">⚙</span>Production Lines</div>
+    <div class="nav-item" data-view="regional"><span class="ic">◈</span>Regional Demand</div>
+    <div class="nav-item" data-view="suppliers"><span class="ic">▤</span>Suppliers</div>
+    <div class="sidebar-section">Operations</div>
+    <div class="nav-item" data-view="factories"><span class="ic">⌂</span>Factories</div>
+    <div class="nav-item" data-view="upload"><span class="ic">↑</span>Upload Data</div>
+  </nav>
+  <div class="tenant-box">
+    <div class="cn" id="tCompany">—</div>
+    <div class="ci" id="tCompanyId">—</div>
+    <div class="fx" id="tFactory">—</div>
+    <div class="logout" onclick="logout()">→ Sign out</div>
+  </div>
+</aside>
+
+<!-- ─── MAIN ─── -->
+<main>
+  <div class="topbar">
+    <div>
+      <h1 id="viewTitle">Overview</h1>
+      <div class="sub" id="viewSub">Headline KPIs for your company</div>
+    </div>
+    <div class="badge-alert" id="alertBadge" style="display:none"></div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section class="view active" id="view-overview">
+    <div id="overviewAlertBanner" class="alert-banner hidden"></div>
+
+    <div class="kpi-grid">
+      <div class="kpi c1"><div class="lbl">Total Production</div><div class="val" id="kProd">—</div><div class="unit">tonnes</div></div>
+      <div class="kpi c2"><div class="lbl">Total Revenue</div><div class="val" id="kRev">—</div><div class="unit">EGP</div></div>
+      <div class="kpi c3"><div class="lbl">Avg Efficiency</div><div class="val" id="kEff">—</div><div class="unit">%</div></div>
+      <div class="kpi c4"><div class="lbl">Total Orders</div><div class="val" id="kOrders">—</div><div class="unit">orders</div></div>
+    </div>
+
+    <div class="row2">
+      <div class="panel">
+        <div class="panel-hd"><h3>Production &amp; Revenue — Daily</h3></div>
+        <div class="panel-sub">Tonnes produced vs. revenue over time</div>
+        <div class="cv h260"><canvas id="dailyChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd"><h3>Market Price EGP/t</h3></div>
+        <div class="panel-sub">Steel spot price with spike markers</div>
+        <div class="cv h260"><canvas id="priceChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="row2-eq">
+      <div class="panel">
+        <div class="panel-hd"><h3>Plant Efficiency Trend</h3></div>
+        <div class="panel-sub">Daily average efficiency across lines</div>
+        <div class="cv h220"><canvas id="effChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd"><h3>Regional Demand</h3></div>
+        <div class="panel-sub">Revenue by region (EGP)</div>
+        <div class="cv h220"><canvas id="regionChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="row-full">
+      <div class="panel">
+        <div class="panel-hd"><h3>Supplier Risk Scorecard</h3></div>
+        <div class="panel-sub">Ranked by risk score (highest first)</div>
+        <div class="tbl-wrap" id="ovSupTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUCTION LINES -->
+  <section class="view" id="view-production">
+    <div class="row-full">
+      <div class="panel">
+        <div class="panel-hd"><h3>Production Lines — Efficiency</h3></div>
+        <div class="panel-sub">Sorted worst → best efficiency</div>
+        <div class="tbl-wrap" id="prodTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REGIONAL DEMAND -->
+  <section class="view" id="view-regional">
+    <div class="row2-eq">
+      <div class="panel">
+        <div class="panel-hd"><h3>Revenue by Region</h3></div>
+        <div class="panel-sub">EGP total per region</div>
+        <div class="cv h260"><canvas id="regChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd"><h3>Regional Demand Table</h3></div>
+        <div class="panel-sub">Detailed breakdown by governorate</div>
+        <div class="tbl-wrap" id="regTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUPPLIERS -->
+  <section class="view" id="view-suppliers">
+    <div class="row-full">
+      <div class="panel">
+        <div class="panel-hd"><h3>Supplier Scorecard</h3></div>
+        <div class="panel-sub">All suppliers ranked by risk score</div>
+        <div class="tbl-wrap" id="supTable"><div class="loading">Loading…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FACTORIES -->
+  <section class="view" id="view-factories">
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-hd"><h3>Your Factory Units</h3></div>
+        <div class="tbl-wrap" id="facTable"><div class="loading">Loading…</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd"><h3>Register a New Unit</h3></div>
+        <label>Factory Name</label>
+        <input id="fName" placeholder="Alexandria Plant">
+        <label>Governorate</label>
+        <select id="fGov"></select>
+        <label>Code (optional)</label>
+        <input id="fCode" placeholder="ALEX">
+        <button class="btn" id="facBtn" onclick="registerFactory()">Register Unit</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- UPLOAD -->
+  <section class="view" id="view-upload">
+    <div class="row-full">
+      <div class="panel">
+        <div class="panel-hd"><h3>1 · Choose Data Type</h3></div>
+        <div class="uploadtypes" id="uTypes"></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <div class="panel-hd"><h3>2 · Select Factory &amp; File</h3></div>
+        <label>Factory Unit</label>
+        <select id="uFactory"></select>
+        <label>Excel File (.xlsx)</label>
+        <input type="file" id="uFile" accept=".xlsx,.xls">
+        <button class="btn" id="upBtn" onclick="uploadFile()">Upload &amp; Trigger ETL</button>
+      </div>
+      <div class="panel">
+        <div class="panel-hd"><h3>Download Template</h3></div>
+        <p style="color:var(--ash);font-size:14px;margin-bottom:6px">Get the right column layout for the selected data type.</p>
+        <button class="btn btn-ghost" onclick="downloadTemplate()">↓ Download Template</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+</div><!-- /.app -->
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN=localStorage.getItem('ff_token');
+const USER=JSON.parse(localStorage.getItem('ff_user')||'{}');
+if(!TOKEN){location.href='/login';}
+
+const H={'Authorization':'Bearer '+TOKEN};
+const C={ember:'#ff5a1f',ember2:'#ff8a3d',molten:'#ffb347',cyan:'#4fd1c5',purple:'#9b8cff',ash:'#8b93a1',line:'#2a2e35',g2:'#1c1f24'};
+Chart.defaults.color=C.ash;Chart.defaults.font.family="'JetBrains Mono',monospace";Chart.defaults.font.size=11;
+
+const GOVS=["Cairo","Giza","Qalyubia","Alexandria","Beheira","Matrouh","Dakahlia","Sharqia","Gharbia",
+  "Monufia","Kafr_El_Sheikh","Damietta","Suez","Ismailia","Port_Said","Fayoum","Beni_Suef","Minya",
+  "Assiut","Sohag","Qena","Luxor","Aswan","Red_Sea","South_Sinai","North_Sinai","New_Valley","Multiple"];
+const UTYPES=[
+  {k:'market',label:'Market',desc:'prices'},{k:'production',label:'Production',desc:'batches'},
+  {k:'orders',label:'Orders',desc:'sales'},{k:'shipments',label:'Shipments',desc:'logistics'},
+  {k:'raw_materials',label:'Raw Mat.',desc:'purchases'}
+];
+let selectedType='production';
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+document.getElementById('tCompany').textContent=USER.company_name||'Company';
+document.getElementById('tCompanyId').textContent=USER.company_id||'';
+document.getElementById('tFactory').textContent=USER.factory_name||'';
+
+function toast(text,ok=true){
+  const t=document.getElementById('toast');t.className='toast '+(ok?'ok':'err');t.textContent=text;
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4200);
+}
+async function api(path,opts={}){
+  const r=await fetch('/api'+path,{...opts,headers:{...H,...(opts.headers||{})}});
+  if(r.status===401){logout();throw new Error('session expired');}
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error((j&&j.detail)?(typeof j.detail==='string'?j.detail:JSON.stringify(j.detail)):('HTTP '+r.status));
+  return j;
+}
+function logout(){localStorage.removeItem('ff_token');localStorage.removeItem('ff_user');location.href='/login';}
+function num(n){n=Number(n)||0;return n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':Math.round(n);}
+
+// ── navigation ────────────────────────────────────────────────────────────────
+const TITLES={
+  overview:['Overview','Headline KPIs for your company'],
+  production:['Production Lines','Line-level efficiency & downtime'],
+  regional:['Regional Demand','Orders & revenue by governorate'],
+  suppliers:['Suppliers','Supply risk scorecard'],
+  factories:['Factories','Manage your registered units'],
+  upload:['Upload Data','Feed your medallion pipeline']
+};
+document.querySelectorAll('.nav-item').forEach(el=>{
+  el.onclick=()=>{
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    el.classList.add('active');
+    const v=el.dataset.view;
+    document.getElementById('view-'+v).classList.add('active');
+    document.getElementById('viewTitle').textContent=TITLES[v][0];
+    document.getElementById('viewSub').textContent=TITLES[v][1];
+    LOADERS[v]&&LOADERS[v]();
+  };
+});
+
+// ── chart helpers ─────────────────────────────────────────────────────────────
+function hexA(hex,a){const n=parseInt(hex.slice(1),16);return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;}
+function grad(ctx,area,hex,a1,a2){
+  const g=ctx.createLinearGradient(0,area.top,0,area.bottom);
+  g.addColorStop(0,hexA(hex,a1));g.addColorStop(1,hexA(hex,a2));return g;
+}
+const baseOpts=(ylTitle,yrTitle)=>({
+  responsive:true,maintainAspectRatio:false,
+  interaction:{mode:'index',intersect:false},
+  plugins:{legend:{display:!!(ylTitle&&yrTitle),labels:{boxWidth:10,padding:12}},
+    tooltip:{backgroundColor:C.g2,borderColor:C.line,borderWidth:1,padding:9}},
+  scales:{
+    x:{grid:{color:'rgba(42,46,53,.4)'},ticks:{maxTicksLimit:9}},
+    y:{position:'left',grid:{color:'rgba(42,46,53,.4)'},title:{display:!!ylTitle,text:ylTitle,color:C.ash}},
+    ...(yrTitle?{y1:{position:'right',grid:{display:false},title:{display:true,text:yrTitle,color:C.ash}}}:{})
+  }
+});
+
+// ── overview charts ───────────────────────────────────────────────────────────
+let dailyChart,priceChart,effChart,regionChart,regViewChart;
+let ovLoaded=false;
+
+function buildOverviewCharts(){
+  if(ovLoaded)return; ovLoaded=true;
+  // daily production+revenue
+  const dc=document.getElementById('dailyChart').getContext('2d');
+  dailyChart=new Chart(dc,{data:{labels:[],datasets:[
+    {type:'bar',label:'Revenue (EGP)',data:[],backgroundColor:hexA(C.cyan,.28),borderColor:hexA(C.cyan,.65),borderWidth:1,yAxisID:'y1',order:2},
+    {type:'line',label:'Production (t)',data:[],borderColor:C.ember,borderWidth:2,tension:.3,pointRadius:0,yAxisID:'y',order:1,
+     fill:true,backgroundColor:(c)=>{const{ctx:x,chartArea:a}=c.chart;if(!a)return null;return grad(x,a,C.ember,.22,0)}}
+  ]},options:baseOpts('Tonnes','EGP')});
+  // price chart
+  const pc=document.getElementById('priceChart').getContext('2d');
+  priceChart=new Chart(pc,{data:{labels:[],datasets:[
+    {type:'line',label:'Steel Price',data:[],borderColor:C.molten,borderWidth:2,tension:.3,pointRadius:0,
+     fill:true,backgroundColor:(c)=>{const{ctx:x,chartArea:a}=c.chart;if(!a)return null;return grad(x,a,C.molten,.22,0)}},
+    {type:'scatter',label:'Spike',data:[],pointBackgroundColor:C.ember,pointBorderColor:'#fff',pointRadius:5,showLine:false}
+  ]},options:baseOpts('EGP/tonne',null)});
+  // efficiency
+  const ec=document.getElementById('effChart').getContext('2d');
+  effChart=new Chart(ec,{data:{labels:[],datasets:[
+    {type:'line',label:'Efficiency %',data:[],borderColor:C.cyan,borderWidth:2,tension:.3,pointRadius:0,
+     fill:true,backgroundColor:(c)=>{const{ctx:x,chartArea:a}=c.chart;if(!a)return null;return grad(x,a,C.cyan,.17,0)}}
+  ]},options:baseOpts('Efficiency %',null)});
+  // regional
+  const rc=document.getElementById('regionChart').getContext('2d');
+  regionChart=new Chart(rc,{type:'bar',data:{labels:[],datasets:[
+    {label:'Revenue',data:[],backgroundColor:[C.ember,C.cyan,C.molten,C.purple,hexA(C.ember,.6),hexA(C.cyan,.6),hexA(C.molten,.6)],borderRadius:2}
+  ]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+    plugins:{legend:{display:false},tooltip:{backgroundColor:C.g2,borderColor:C.line,borderWidth:1,padding:9}},
+    scales:{x:{grid:{color:'rgba(42,46,53,.4)'},ticks:{callback:v=>num(v)}},y:{grid:{color:'rgba(42,46,53,.22)'}}}}});
+}
+
+async function loadOverview(){
+  buildOverviewCharts();
+  // summary KPIs
+  try{
+    const s=await api('/dashboard/summary');
+    const k=s.kpis||{};
+    document.getElementById('kProd').textContent=num(k.total_production_tons);
+    document.getElementById('kRev').textContent=num(k.total_revenue_egp);
+    document.getElementById('kEff').textContent=(Number(k.avg_efficiency)||0).toFixed(1);
+    document.getElementById('kOrders').textContent=num(k.total_orders);
+  }catch(e){toast('Summary: '+e.message,false);}
+
+  // daily series
+  try{
+    const d=await api('/dashboard/daily?limit=180');
+    const s=d.series||[];
+    const labels=s.map(x=>String(x.date).slice(5));
+    dailyChart.data.labels=labels;
+    dailyChart.data.datasets[0].data=s.map(x=>Number(x.total_revenue_egp)||0);
+    dailyChart.data.datasets[1].data=s.map(x=>Number(x.total_production_tons)||0);
+    dailyChart.update('none');
+    effChart.data.labels=labels;
+    effChart.data.datasets[0].data=s.map(x=>Number(x.avg_efficiency)||0);
+    effChart.update('none');
+    priceChart.data.labels=labels;
+    priceChart.data.datasets[0].data=s.map(x=>Number(x.steel_price_egp)||0);
+    priceChart.update('none');
+  }catch(e){}
+
+  // price spikes
+  try{
+    const a=await api('/dashboard/price-alerts?limit=200');
+    const alerts=a.alerts||[];
+    const b=document.getElementById('alertBadge');
+    if(alerts.length){
+      b.style.display='inline-block';b.textContent='⚠ '+a.count+' price-spike day(s)';
+      const spikes=alerts.map(x=>({x:String(x.date).slice(5),y:Number(x.steel_price_egypt_egp)||0}));
+      priceChart.data.datasets[1].data=spikes;
+      priceChart.update('none');
+      showOverviewBanner('warn','⚠ '+alerts.length+' price spike days detected in your data.');
+    } else {
+      b.style.display='none';
+      showOverviewBanner('ok','◈ No price anomalies detected in current dataset.');
+    }
+  }catch(e){document.getElementById('alertBadge').style.display='none';}
+
+  // regional for overview chart
+  try{
+    const rd=await api('/dashboard/regional-demand');
+    const r=rd.regions||[];
+    regionChart.data.labels=r.map(x=>x.region||x.governorate||'?');
+    regionChart.data.datasets[0].data=r.map(x=>Number(x.total_revenue_egp)||0);
+    regionChart.update('none');
+  }catch(e){}
+
+  // supplier table in overview
+  loadOverviewSuppliers();
+}
+
+function showOverviewBanner(type,msg){
+  const el=document.getElementById('overviewAlertBanner');
+  el.className='alert-banner '+type;
+  el.innerHTML='<span>'+msg+'</span>';
+}
+
+async function loadOverviewSuppliers(){
+  const el=document.getElementById('ovSupTable');
+  try{
+    const d=await api('/dashboard/suppliers');
+    el.innerHTML=buildSupTable(d.suppliers||[]);
+  }catch(e){el.innerHTML='<div class="empty-state">'+e.message+'</div>';}
+}
+
+// ── production ────────────────────────────────────────────────────────────────
+async function loadProduction(){
+  const el=document.getElementById('prodTable');
+  try{
+    const d=await api('/dashboard/production-lines');
+    if(!(d.lines||[]).length){el.innerHTML='<div class="empty-state">No production data yet.</div>';return;}
+    const rows=d.lines.map(r=>{
+      const eff=Number(r.avg_efficiency)||0;
+      const cls=eff<70?'risk-hi':eff<85?'risk-md':'risk-lo';
+      return `<tr><td>${r.facility||'—'}</td><td>${r.production_line||'—'}</td><td>${r.line_type||'—'}</td>
+        <td class="mono">${num(r.total_output_tons)} t</td>
+        <td><span class="tag ${cls}">${eff.toFixed(1)}%</span></td>
+        <td class="mono">${(Number(r.downtime_pct)||0).toFixed(1)}%</td>
+        <td class="mono">${r.best_shift||'—'}</td><td class="mono">${r.worst_shift||'—'}</td></tr>`;
+    }).join('');
+    el.innerHTML=`<table><thead><tr><th>Facility</th><th>Line</th><th>Type</th>
+      <th>Output</th><th>Efficiency</th><th>Downtime</th><th>Best Shift</th><th>Worst Shift</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){el.innerHTML='<div class="empty-state">'+e.message+'</div>';}
+}
+
+// ── regional ──────────────────────────────────────────────────────────────────
+let regChartBuilt=false;
+async function loadRegional(){
+  const el=document.getElementById('regTable');
+  if(!regChartBuilt){
+    regChartBuilt=true;
+    const rc=document.getElementById('regChart').getContext('2d');
+    regViewChart=new Chart(rc,{type:'bar',data:{labels:[],datasets:[
+      {label:'Revenue',data:[],backgroundColor:[C.ember,C.cyan,C.molten,C.purple,hexA(C.ember,.6),hexA(C.cyan,.6),hexA(C.molten,.6)],borderRadius:2}
+    ]},options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{backgroundColor:C.g2,borderColor:C.line,borderWidth:1,padding:9}},
+      scales:{x:{grid:{color:'rgba(42,46,53,.4)'},ticks:{callback:v=>num(v)}},y:{grid:{color:'rgba(42,46,53,.22)'}}}}});
+  }
+  try{
+    const d=await api('/dashboard/regional-demand');
+    const r=d.regions||[];
+    if(!r.length){el.innerHTML='<div class="empty-state">No regional data yet.</div>';return;}
+    regViewChart.data.labels=r.map(x=>x.region||x.governorate||'?');
+    regViewChart.data.datasets[0].data=r.map(x=>Number(x.total_revenue_egp)||0);
+    regViewChart.update('none');
+    const rows=r.map(x=>`<tr><td>${x.governorate||'—'}</td><td>${x.region||'—'}</td>
+      <td class="mono">${num(x.total_orders)}</td><td class="mono">${num(x.total_quantity_tons)} t</td>
+      <td class="mono">${num(x.total_revenue_egp)}</td>
+      <td class="mono">${(Number(x.delay_pct)||0).toFixed(1)}%</td>
+      <td>${x.top_product||'—'}</td></tr>`).join('');
+    el.innerHTML=`<table><thead><tr><th>Governorate</th><th>Region</th><th>Orders</th>
+      <th>Qty (t)</th><th>Revenue</th><th>Delay %</th><th>Top Product</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+  }catch(e){el.innerHTML='<div class="empty-state">'+e.message+'</div>';}
+}
+
+// ── suppliers ─────────────────────────────────────────────────────────────────
+function buildSupTable(arr){
+  if(!arr.length) return '<div class="empty-state">No supplier data yet.</div>';
+  const rows=arr.map(r=>{
+    const risk=Number(r.risk_score)||0;
+    const cls=risk>=50?'risk-hi':risk>=25?'risk-md':'risk-lo';
+    return `<tr><td>${r.supplier_name||'—'}</td><td>${r.origin_country||'—'}</td>
+      <td>${r.material_type||'—'}</td><td class="mono">${(Number(r.avg_price_per_ton_usd)||0).toFixed(0)}</td>
+      <td class="mono">${(Number(r.avg_lead_time_days)||0).toFixed(1)}</td>
+      <td class="mono">${(Number(r.on_time_pct)||0).toFixed(1)}%</td>
+      <td><span class="tag ${cls}">${risk.toFixed(0)}</span></td></tr>`;
+  }).join('');
+  return `<table><thead><tr><th>Supplier</th><th>Origin</th><th>Material</th>
+    <th>Avg $/t</th><th>Lead (d)</th><th>On-time</th><th>Risk</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+async function loadSuppliers(){
+  const el=document.getElementById('supTable');
+  try{const d=await api('/dashboard/suppliers');el.innerHTML=buildSupTable(d.suppliers||[]);}
+  catch(e){el.innerHTML='<div class="empty-state">'+e.message+'</div>';}
+}
+
+// ── factories ─────────────────────────────────────────────────────────────────
+async function loadFactories(){
+  const el=document.getElementById('facTable');
+  try{
+    const d=await api('/factories');
+    const list=d.factories||[];
+    if(!list.length) el.innerHTML='<div class="empty-state">No factory units — register one.</div>';
+    else el.innerHTML=`<table><thead><tr><th>Factory ID</th><th>Name</th><th>Governorate</th></tr></thead><tbody>`+
+      list.map(r=>`<tr><td class="mono">${r.factory_id}</td><td>${r.factory_name}</td><td>${r.governorate||'—'}</td></tr>`).join('')+
+      '</tbody></table>';
+    const sel=document.getElementById('uFactory');
+    sel.innerHTML=list.length?list.map(r=>`<option value="${r.factory_id}">${r.factory_name} (${r.factory_id})</option>`).join(''):
+      '<option value="">No factories — register one first</option>';
+  }catch(e){el.innerHTML='<div class="empty-state">'+e.message+'</div>';}
+}
+async function registerFactory(){
+  const btn=document.getElementById('facBtn');btn.disabled=true;
+  try{
+    await api('/factories',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({factory_name:document.getElementById('fName').value.trim(),
+        governorate:document.getElementById('fGov').value,
+        factory_code:document.getElementById('fCode').value.trim()})});
+    toast('Factory unit registered');
+    document.getElementById('fName').value='';document.getElementById('fCode').value='';
+    loadFactories();
+  }catch(e){toast('Register failed: '+e.message,false);}
+  finally{btn.disabled=false;}
+}
+
+// ── upload ────────────────────────────────────────────────────────────────────
+function renderUTypes(){
+  document.getElementById('uTypes').innerHTML=UTYPES.map(t=>
+    `<div class="utype ${t.k===selectedType?'active':''}" data-k="${t.k}">
+       <div class="un">${t.label}</div><div class="ud">${t.desc}</div></div>`).join('');
+  document.querySelectorAll('.utype').forEach(el=>el.onclick=()=>{
+    selectedType=el.dataset.k;
+    document.querySelectorAll('.utype').forEach(u=>u.classList.toggle('active',u.dataset.k===selectedType));
+  });
+}
+async function uploadFile(){
+  const f=document.getElementById('uFile').files[0];
+  const factory=document.getElementById('uFactory').value;
+  if(!f) return toast('Choose an .xlsx file first',false);
+  if(!factory) return toast('Register a factory unit first',false);
+  const btn=document.getElementById('upBtn');btn.disabled=true;
+  try{
+    const fd=new FormData();fd.append('file',f);fd.append('factory_id',factory);
+    const r=await fetch('/api/upload/excel/'+selectedType,{method:'POST',headers:H,body:fd});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.detail?(typeof j.detail==='string'?j.detail:JSON.stringify(j.detail)):('HTTP '+r.status));
+    toast('Uploaded — '+(j.message||'ETL triggered'));
+    document.getElementById('uFile').value='';
+  }catch(e){toast('Upload failed: '+e.message,false);}
+  finally{btn.disabled=false;}
+}
+function downloadTemplate(){window.open('/api/upload/templates/'+selectedType,'_blank');}
+
+// ── init ──────────────────────────────────────────────────────────────────────
+document.getElementById('fGov').innerHTML=GOVS.map(g=>`<option value="${g}">${g.replace(/_/g,' ')}</option>`).join('');
+renderUTypes();
+
+const LOADERS={overview:loadOverview,production:loadProduction,regional:loadRegional,
+  suppliers:loadSuppliers,factories:loadFactories,upload:loadFactories};
+
+loadOverview();
+</script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+version: '3.8'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# YAML anchor: shared Airflow environment injected into every Airflow service
+# ─────────────────────────────────────────────────────────────────────────────
+x-airflow-common-env: &airflow-common-env
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASS}@airflow-postgres:5432/airflow
+  AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+  AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+  AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+  AIRFLOW__WEBSERVER__BASE_URL: "http://airflow-webserver:8080"
+  AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+  AIRFLOW__LOGGING__SENSITIVE_FIELDS: "password,secret,passwd,authorization,api_key,apikey,access_token"
+
+x-airflow-common-volumes: &airflow-common-volumes
+  - ./dags:/opt/airflow/dags
+  - ./logs:/opt/airflow/logs
+  - ./scripts:/opt/airflow/scripts
+  - ./data:/opt/airflow/data
+
+services:
+
+  # ========== ZOOKEEPER ==========
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2185:2181"
+    networks:
+      - steel-network
+
+  # ========== KAFKA ==========
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    networks:
+      - steel-network
+
+  # ========== KAFKA UI ==========
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: steel-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    ports:
+      - "8086:8080"
+    networks:
+      - steel-network
+
+  # ========== SPARK MASTER ==========
+  spark-master:
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    container_name: spark-master
+    user: root                                          # ← ADDED
+    environment:
+      - SPARK_MODE=master
+      - SPARK_OPTS=--conf spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version=2 --conf spark.hadoop.fs.permissions.umask-mode=000 --conf spark.hadoop.dfs.permissions.enabled=false
+    volumes:
+      - .:/opt/spark/scripts
+      - ./data:/opt/spark/data
+    ports:
+      - "7077:7077"
+      - "8081:8080"
+      - "8501:8501"
+    networks:
+      - steel-network
+
+  # ========== SPARK WORKER ==========
+  spark-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    container_name: spark-worker
+    user: root                                          # ← ADDED
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_OPTS=--conf spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version=2 --conf spark.hadoop.fs.permissions.umask-mode=000 --conf spark.hadoop.dfs.permissions.enabled=false
+    volumes:
+      - .:/opt/spark/scripts
+      - ./data:/opt/spark/data
+    networks:
+      - steel-network
+
+  # ========== STEEL POSTGRESQL ==========
+  steel-postgres:
+    image: postgres:13
+    container_name: steel-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: steel_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - steel_postgres_data:/var/lib/postgresql/data
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d steel_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - steel-network
+  # ========== FERROFLUX WEB PORTAL ==========
+  # ========== FERROFLUX WEB PORTAL ==========
+  # ========== FERROFLUX WEB PORTAL ==========
+  steel-portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: steel-portal
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://steel_admin:steel_pass@steel-postgres:5432/steel_db
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - AIRFLOW_BASE_URL=http://airflow-webserver:8080/api/v1
+      - AIRFLOW_USER=admin
+      - AIRFLOW_PASSWORD=admin123
+    volumes:
+      - ./portal:/app
+      - ./data:/app/data
+    depends_on:
+      steel-postgres:
+        condition: service_healthy
+      kafka:
+        condition:  service_started
+    networks:
+      - steel-network
+  # ========== AIRFLOW POSTGRESQL ==========
+  airflow-postgres:
+    image: postgres:13
+    container_name: airflow-postgres
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASS}
+      POSTGRES_DB: airflow
+    ports:
+      - "5435:5432"
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER} -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - steel-network
+
+  # ========== PGADMIN ==========
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@steelsc.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8088:80"
+    depends_on:
+      - steel-postgres
+      - airflow-postgres
+    networks:
+      - steel-network
+
+  # ========== REDIS ==========
+  redis:
+    image: redis:7-alpine
+    container_name: airflow-redis
+    ports:
+      - "6375:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - steel-network
+
+  # ========== AIRFLOW INIT ==========
+  airflow-init:
+    build: .
+    container_name: airflow-init
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USER}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD}
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate && \
+        airflow users delete --username ${AIRFLOW_USER} 2>/dev/null || true && \
+        airflow users create \
+          --username ${AIRFLOW_USER} \
+          --password ${AIRFLOW_PASSWORD} \
+          --firstname Steel \
+          --lastname Admin \
+          --role Admin \
+          --email admin@steelsc.com
+    volumes: *airflow-common-volumes
+    restart: on-failure
+    networks:
+      - steel-network
+
+  # ========== AIRFLOW WEBSERVER ==========
+  airflow-webserver:
+    build: .
+    container_name: airflow-webserver
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *airflow-common-env
+      AIRFLOW__WEBSERVER__WORKERS: "1"
+      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+    command: webserver
+    ports:
+      - "8089:8080"
+    volumes: *airflow-common-volumes
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - steel-network
+
+  # ========== AIRFLOW SCHEDULER ==========
+  airflow-scheduler:
+    build: .
+    container_name: airflow-scheduler
+    user: "root"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *airflow-common-env
+    command: scheduler
+    volumes: *airflow-common-volumes
+    networks:
+      - steel-network
+
+networks:
+  steel-network:
+    driver: bridge
+
+volumes:
+  airflow_postgres_data:
+  steel_postgres_data:

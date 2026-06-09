@@ -1,0 +1,22 @@
+# Base Data Science
+pandas==2.0.3
+numpy==1.24.4
+pyarrow==14.0.0
+
+# Spark & Orchestration
+# Note: pyspark is already included in apache/spark:3.4.4-python3 image
+# pyspark==3.5.0  # Removed - conflicts with Spark 3.4.4
+python-dotenv==1.0.0
+
+# Kafka
+kafka-python==2.0.2
+confluent-kafka==2.3.0
+
+# Database
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+
+# Web & ML
+requests==2.31.0
+streamlit==1.30.0
+scikit-learn==1.3.2

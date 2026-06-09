@@ -1,0 +1,120 @@
+{
+  "name": "FerroFlux · Workflow 1 — Real-Time Anomaly Alerting",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "steel-alert",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "Spark Anomaly Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 380],
+      "webhookId": "steel-alert",
+      "notes": "Spark Silver/Gold ETL POSTs here: { event_type, payload:{ company_id, factory_id, ... } }. Full URL inside the network: http://n8n:5678/webhook/steel-alert"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize the Spark payload and derive routing fields.\n// Spark sends: { event_type, severity?, payload: { company_id, factory_id, ... } }\nconst items = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || item.json;\n  const p = body.payload || {};\n  const eventType = body.event_type || 'unknown';\n\n  // human-readable message per anomaly type\n  let title, detail;\n  switch (eventType) {\n    case 'price_spike':\n      title = '⚠️ Steel price spike';\n      detail = `${p.material_type || 'steel'} moved ${p.price_change_pct ?? '?'}% on ${p.date ?? 'latest tick'} (now ${p.steel_price_egypt_egp ?? p.price ?? '?'} EGP).`;\n      break;\n    case 'low_efficiency':\n    case 'line_efficiency_low':\n      title = '🔧 Factory efficiency below 70%';\n      detail = `${p.facility || p.production_line || 'A line'} is running at ${p.efficiency ?? p.avg_efficiency ?? '?'}%.`;\n      break;\n    case 'factory_onboarded':\n      title = '🏭 New factory unit onboarded';\n      detail = `${p.factory_name} (${p.factory_id}) in ${p.governorate}.`;\n      break;\n    default:\n      title = `Alert: ${eventType}`;\n      detail = JSON.stringify(p);\n  }\n\n  items.push({ json: {\n    event_type: eventType,\n    company_id: p.company_id || 'UNKNOWN',\n    factory_id: p.factory_id || null,\n    severity: body.severity || (eventType === 'price_spike' ? 'high' : 'warning'),\n    title,\n    detail,\n    raw: p\n  }});\n}\nreturn items;"
+      },
+      "id": "normalize",
+      "name": "Normalize & Enrich",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 380],
+      "notes": "Maps Spark event_type to a title/detail and pulls company_id/factory_id for per-tenant routing."
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": true }, "conditions": [ { "leftValue": "={{ $json.event_type }}", "rightValue": "price_spike", "operator": { "type": "string", "operation": "equals" } } ] }, "outputKey": "price" },
+            { "conditions": { "options": { "caseSensitive": true }, "conditions": [ { "leftValue": "={{ $json.event_type }}", "rightValue": "low_efficiency", "operator": { "type": "string", "operation": "equals" } } ] }, "outputKey": "efficiency" }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "route",
+      "name": "Route by Anomaly Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [720, 380],
+      "notes": "price_spike → Slack, low_efficiency → Telegram, everything else → management email. Swap/extend per tenant routing table."
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": { "__rl": true, "value": "#steel-market-alerts", "mode": "name" },
+        "text": "=*{{ $json.title }}*\nTenant: `{{ $json.company_id }}`{{ $json.factory_id ? '  ·  Factory: `' + $json.factory_id + '`' : '' }}\n{{ $json.detail }}",
+        "otherOptions": {}
+      },
+      "id": "slack",
+      "name": "Slack — Market Alerts",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [980, 200],
+      "notes": "Configure Slack OAuth credential. Per-tenant: map company_id → channel via a lookup before this node."
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.raw.telegram_chat_id || '<DEFAULT_CHAT_ID>' }}",
+        "text": "={{ $json.title }}\nTenant: {{ $json.company_id }}\n{{ $json.detail }}",
+        "additionalFields": {}
+      },
+      "id": "telegram",
+      "name": "Telegram — Ops",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [980, 380],
+      "notes": "Configure Telegram Bot API credential. chat_id can come per-tenant from the payload or a lookup table."
+    },
+    {
+      "parameters": {
+        "fromEmail": "alerts@ferroflux.io",
+        "toEmail": "={{ $json.raw.manager_email || 'management@ferroflux.io' }}",
+        "subject": "=[FerroFlux] {{ $json.title }} — {{ $json.company_id }}",
+        "emailFormat": "text",
+        "text": "={{ $json.title }}\n\nTenant: {{ $json.company_id }}\nFactory: {{ $json.factory_id }}\nSeverity: {{ $json.severity }}\n\n{{ $json.detail }}",
+        "options": {}
+      },
+      "id": "email",
+      "name": "Email — Management",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [980, 560],
+      "notes": "Configure SMTP credential. Used for the fallback branch (factory_onboarded, unknown, etc.)."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"received\", \"event_type\": $json.event_type, \"company_id\": $json.company_id } }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Ack to Spark",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1240, 380]
+    }
+  ],
+  "connections": {
+    "Spark Anomaly Webhook": { "main": [[{ "node": "Normalize & Enrich", "type": "main", "index": 0 }]] },
+    "Normalize & Enrich":    { "main": [[{ "node": "Route by Anomaly Type", "type": "main", "index": 0 }]] },
+    "Route by Anomaly Type": {
+      "main": [
+        [{ "node": "Slack — Market Alerts", "type": "main", "index": 0 }],
+        [{ "node": "Telegram — Ops", "type": "main", "index": 0 }],
+        [{ "node": "Email — Management", "type": "main", "index": 0 }]
+      ]
+    },
+    "Slack — Market Alerts": { "main": [[{ "node": "Ack to Spark", "type": "main", "index": 0 }]] },
+    "Telegram — Ops":        { "main": [[{ "node": "Ack to Spark", "type": "main", "index": 0 }]] },
+    "Email — Management":    { "main": [[{ "node": "Ack to Spark", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "ferroflux" }, { "name": "alerting" }]
+}
