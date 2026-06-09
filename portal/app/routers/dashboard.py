@@ -6,9 +6,9 @@
 # no code path where a client can widen its own scope.
 # ============================================================
 import logging
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Path
 
-from app.database import fetch_all, fetch_one
+from app.database import fetch_all, fetch_one, execute
 from app.security import current_tenant, TenantContext
 
 router = APIRouter()
@@ -102,3 +102,40 @@ async def price_alerts(tenant: TenantContext = Depends(current_tenant),
         LIMIT %s
     """, params + (limit,))
     return {"count": len(rows), "alerts": rows}
+
+
+@router.get("/notifications")
+async def notifications(tenant: TenantContext = Depends(current_tenant),
+                        unseen_only: bool = Query(False)):
+    """ETL anomaly alerts for the tenant — optional filter for unread only."""
+    rows = fetch_all(
+        "SELECT id, event_type, title, detail_json, row_count, "
+        "       email_sent, seen, created_at "
+        "FROM public.etl_alerts "
+        "WHERE company_id=%s AND factory_id=%s "
+        + ("AND seen=FALSE " if unseen_only else "")
+        + "ORDER BY created_at DESC LIMIT 50",
+        (tenant.company_id, tenant.factory_id))
+    unseen = sum(1 for r in rows if not r.get("seen"))
+    return {"count": len(rows), "unseen": unseen, "notifications": rows}
+
+
+@router.post("/notifications/{alert_id}/seen")
+async def mark_seen(alert_id: int = Path(...),
+                    tenant: TenantContext = Depends(current_tenant)):
+    """Mark a single alert as seen."""
+    execute(
+        "UPDATE public.etl_alerts SET seen=TRUE "
+        "WHERE id=%s AND company_id=%s AND factory_id=%s",
+        (alert_id, tenant.company_id, tenant.factory_id))
+    return {"ok": True}
+
+
+@router.post("/notifications/seen-all")
+async def mark_all_seen(tenant: TenantContext = Depends(current_tenant)):
+    """Mark all unseen alerts as seen for this tenant."""
+    execute(
+        "UPDATE public.etl_alerts SET seen=TRUE "
+        "WHERE company_id=%s AND factory_id=%s AND seen=FALSE",
+        (tenant.company_id, tenant.factory_id))
+    return {"ok": True}

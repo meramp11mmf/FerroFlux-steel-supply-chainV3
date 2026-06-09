@@ -265,11 +265,6 @@ supplier_risk = all_scored \
         F.round(F.avg("price_per_ton_usd"), 2).alias("avg_price_usd"),
         F.round(F.avg("supplier_reliability"), 4).alias("avg_reliability")
     ) \
-    .withColumn("risk_level",
-        F.when(F.col("avg_risk_score") >= 50, "HIGH")
-        .when(F.col("avg_risk_score") >= 25, "MEDIUM")
-        .otherwise("LOW")
-    ) \
     .withColumn("on_time_factor", F.round(100 - F.col("late_delivery_pct"), 2)) \
     .withColumn("quality_factor", F.round(F.col("avg_quality") / 4 * 100, 2)) \
     .withColumn("price_factor", F.round(
@@ -279,6 +274,22 @@ supplier_risk = all_scored \
         .otherwise(90.0), 2
     )) \
     .orderBy("avg_risk_score")
+
+# Data-driven risk_level thresholds (percentile-based)
+score_percentiles = supplier_risk.agg(
+    F.expr("percentile_approx(avg_risk_score, 0.33)").alias("p33"),
+    F.expr("percentile_approx(avg_risk_score, 0.67)").alias("p67"),
+).collect()[0]
+
+thresh_low  = float(score_percentiles["p33"])
+thresh_high = float(score_percentiles["p67"])
+print(f"\n   Risk thresholds — LOW < {thresh_low:.1f} ≤ MEDIUM < {thresh_high:.1f} ≤ HIGH")
+
+supplier_risk = supplier_risk.withColumn("risk_level",
+    F.when(F.col("avg_risk_score") >= thresh_high, "HIGH")
+    .when(F.col("avg_risk_score") >= thresh_low,   "MEDIUM")
+    .otherwise("LOW")
+)
 
 print("\n   SUPPLIER RISK SCORECARD:")
 supplier_risk.select(

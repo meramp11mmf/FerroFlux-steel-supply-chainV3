@@ -103,11 +103,18 @@ feature_cols = [
     "day_of_week", "month_val", "quarter_val"
 ]
 
-target_col = "steel_price_egypt_egp"
+target_col = "steel_price_egp"   # actual column name in analytics.price_features
 
 df_clean = df.select(["date", target_col] + feature_cols).dropna()
 clean_count = df_clean.count()
 print(f"   After dropping nulls: {clean_count} rows (dropped {total - clean_count} rows with null lags)")
+
+if clean_count == 0:
+    print("\nERROR: No training rows after filtering nulls.")
+    print("       analytics.price_features has no computed lag columns.")
+    print("       Fix: run Gold ETL first (manager.py → ETL Pipelines → Gold only).")
+    spark.stop()
+    import sys; sys.exit(1)
 
 # ============================================================
 # 2. TRAIN/TEST SPLIT (Time-based: last 30 days for test)
@@ -166,7 +173,7 @@ rmse_gbt = evaluator_rmse.evaluate(predictions_gbt)
 mae_gbt = evaluator_mae.evaluate(predictions_gbt)
 r2_gbt = evaluator_r2.evaluate(predictions_gbt)
 
-avg_price = df_test.agg(F.avg(target_col)).collect()[0][0]
+avg_price = float(df_test.agg(F.avg(target_col)).collect()[0][0])
 mape_gbt = mae_gbt / avg_price * 100
 
 print(f"   GBT Results:")

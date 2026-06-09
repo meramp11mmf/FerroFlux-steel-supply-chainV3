@@ -390,10 +390,10 @@ print("\n" + "=" * 50)
 print("TABLE 6 / 6 — price_features (ML input)")
 print("=" * 50)
 
-w_date = Window.partitionBy("company_id", "factory_id", "year").orderBy("date")
+# Global date window — lags span the full 730-day range without year-boundary resets
+w_date = Window.orderBy("date")
 
 price_features = df_mkt \
-    .withColumn("year", F.year("date")) \
     .withColumn("price_lag_1d",  F.lag("steel_price_egypt_egp", 1).over(w_date)) \
     .withColumn("price_lag_7d",  F.lag("steel_price_egypt_egp", 7).over(w_date)) \
     .withColumn("price_lag_14d", F.lag("steel_price_egypt_egp", 14).over(w_date)) \
@@ -412,14 +412,16 @@ price_features = df_mkt \
     .withColumn("day_of_week", F.dayofweek("date")) \
     .withColumn("month_val", F.month("date")) \
     .withColumn("quarter_val", F.quarter("date")) \
+    .withColumn("year", F.year("date")) \
     .select(
-        "company_id", "factory_id", "date", "year", "steel_price_egypt_egp",
+        "date",
+        F.col("steel_price_egypt_egp").alias("steel_price_egp"),
         "iron_ore_price_usd", "scrap_price_usd", "usd_egp_rate", "natural_gas_price_usd",
         "brent_oil_usd", "electricity_price_egp_kwh", "seasonality_index", "is_ramadan",
         "price_change_pct", "price_lag_1d", "price_lag_7d", "price_lag_14d", "price_lag_30d",
         "moving_avg_7d", "moving_avg_14d", "moving_avg_30d", "price_volatility_7d",
         "price_volatility_30d", "iron_ore_change_pct", "usd_change_pct", "oil_change_pct",
-        "day_of_week", "month_val", "quarter_val") \
+        "day_of_week", "month_val", "quarter_val", "year") \
     .withColumn("loaded_at", F.current_timestamp())
 
 cnt_features = price_features.count()
@@ -428,6 +430,18 @@ print(f"   Built: {cnt_features:,} rows ({ec.safe_pct(null_lag, cnt_features):.1
 
 # global table -> partition by year, full rebuild
 ec.write_partitioned(price_features, f"{GOLD_PATH}/price_features", ["year"], company=None)
+
+# price_features has no tenant columns — TRUNCATE first to avoid duplicate-key on re-run
+try:
+    import psycopg2 as _pg2
+    _c = _pg2.connect(host=PG["host"], port=PG["port"], dbname=PG["db"],
+                      user=PG["user"], password=PG["password"])
+    _c.cursor().execute("TRUNCATE TABLE analytics.price_features")
+    _c.commit(); _c.close()
+    print("   Truncated analytics.price_features before reload")
+except Exception as _te:
+    print(f"   [warn] TRUNCATE skipped: {_te}")
+
 ec.save_pg_tenant(price_features, "analytics.price_features", PG)
 print("   Saved to gold/price_features + PostgreSQL")
 

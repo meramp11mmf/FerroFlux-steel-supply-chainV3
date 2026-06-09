@@ -224,7 +224,7 @@ rmse = evaluator_rmse.evaluate(predictions)
 mae = evaluator_mae.evaluate(predictions)
 r2 = evaluator_r2.evaluate(predictions)
 
-avg_demand = df_test.agg(F.avg("weekly_demand_tons")).collect()[0][0]
+avg_demand = float(df_test.agg(F.avg("weekly_demand_tons")).collect()[0][0])
 mape = mae / avg_demand * 100
 
 print(f"   RMSE:  {rmse:,.2f} tons")

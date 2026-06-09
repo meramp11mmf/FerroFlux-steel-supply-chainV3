@@ -273,9 +273,15 @@ def notify_n8n(event_type, payload):
     if not url:
         return {"sent": False, "reason": "N8N_WEBHOOK_URL not set"}
     try:
-        import requests
+        import requests, json
+        from datetime import date, datetime, time
+        def _default(o):
+            if isinstance(o, (date, datetime, time)):
+                return o.isoformat()
+            return str(o)
         body = {"event_type": event_type, "payload": payload}
-        resp = requests.post(url, json=body, timeout=8)
+        resp = requests.post(url, data=json.dumps(body, default=_default),
+                             headers={"Content-Type": "application/json"}, timeout=8)
         ok = resp.status_code in (200, 201, 202, 204)
         if not ok:
             log.warning(f"n8n alert HTTP {resp.status_code}: {resp.text[:200]}")
@@ -310,3 +316,184 @@ def emit_anomalies_from_df(df, event_type, key_cols, max_rows=200):
 def safe_pct(numerator, denominator):
     """Division guard for log/print stats so empty tenants don't crash."""
     return (numerator / denominator * 100) if denominator else 0.0
+
+
+# ------------------------------------------------------------
+# 6. EMAIL ANOMALY NOTIFICATIONS (per-tenant, HTML summary)
+# ------------------------------------------------------------
+_EVENT_LABELS = {
+    "price_spike":     ("⚠️ Price Spike Detected",         "#c53030", "#fff5f5"),
+    "low_efficiency":  ("⚠️ Low Production Efficiency",    "#c05621", "#fffaf0"),
+}
+
+def _email_cfg(company_id, factory_id, conf=None):
+    """Read SMTP config from tenant_notifications for the given tenant."""
+    import psycopg2
+    c = conf or pg_conf()
+    try:
+        conn = psycopg2.connect(host=c["host"], port=c["port"], dbname=c["db"],
+                                user=c["user"], password=c["password"])
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT notify_email, smtp_host, smtp_port, smtp_user, smtp_password "
+            "FROM public.tenant_notifications "
+            "WHERE company_id=%s AND factory_id=%s AND enabled=TRUE",
+            (company_id, factory_id))
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if row:
+            return {"to": row[0], "host": row[1], "port": row[2],
+                    "user": row[3], "password": row[4]}
+    except Exception as e:
+        log.warning(f"email config lookup failed: {e}")
+    return None
+
+
+def _build_html(company_id, factory_id, event_type, rows, key_cols):
+    from datetime import datetime
+    label, hdr_color, bg_color = _EVENT_LABELS.get(
+        event_type, (f"🔔 {event_type}", "#2b6cb0", "#ebf8ff"))
+
+    def _fmt(v):
+        if v is None:
+            return "—"
+        if isinstance(v, float):
+            return f"{v:,.2f}"
+        return str(v)
+
+    header_cells = "".join(
+        f'<th style="padding:8px 12px;background:#2d3748;color:#fff;'
+        f'text-align:left;white-space:nowrap">{c}</th>' for c in key_cols)
+    body_rows = ""
+    for i, r in enumerate(rows):
+        bg = "#fff" if i % 2 == 0 else "#f7fafc"
+        cells = "".join(
+            f'<td style="padding:7px 12px;border-bottom:1px solid #e2e8f0">'
+            f'{_fmt(r[c] if c in r.__fields__ else None)}</td>'
+            for c in key_cols)
+        body_rows += f'<tr style="background:{bg}">{cells}</tr>'
+
+    return f"""
+<html><body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f0f4f8">
+<table width="100%" cellpadding="0" cellspacing="0"
+       style="max-width:700px;margin:30px auto;background:#fff;
+              border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.12);overflow:hidden">
+  <tr><td style="background:{hdr_color};padding:24px 28px">
+    <div style="color:#fff;font-size:20px;font-weight:bold">{label}</div>
+    <div style="color:rgba(255,255,255,.8);font-size:13px;margin-top:4px">
+      {company_id} / {factory_id} &nbsp;·&nbsp; {datetime.now().strftime("%Y-%m-%d %H:%M")} EET
+    </div>
+  </td></tr>
+  <tr><td style="padding:20px 28px;background:{bg_color}">
+    <span style="font-size:15px;color:#2d3748">
+      <b>{len(rows)}</b> anomal{'y' if len(rows)==1 else 'ies'} detected in this ETL run.
+    </span>
+  </td></tr>
+  <tr><td style="padding:0 28px 8px">
+    <table width="100%" cellspacing="0" cellpadding="0"
+           style="border-collapse:collapse;font-size:13px;margin-top:16px">
+      <thead><tr>{header_cells}</tr></thead>
+      <tbody>{body_rows}</tbody>
+    </table>
+  </td></tr>
+  <tr><td style="padding:16px 28px;background:#f7fafc;border-top:1px solid #e2e8f0">
+    <span style="color:#718096;font-size:12px">
+      Sent automatically by <b>FerroFlux</b> Silver ETL pipeline.
+      Log in to the portal to investigate.
+    </span>
+  </td></tr>
+</table>
+</body></html>"""
+
+
+def _write_alert_to_db(company_id, factory_id, event_type, rows, key_cols,
+                        email_sent, conf=None):
+    """Persist the alert in etl_alerts so the portal can display it."""
+    import psycopg2, json
+    from datetime import date, datetime
+    c = conf or pg_conf()
+    label = _EVENT_LABELS.get(event_type, (f"Alert: {event_type}",))[0]
+    try:
+        def _serial(o):
+            if isinstance(o, (date, datetime)):
+                return o.isoformat()
+            return str(o)
+        sample = [{k: (r[k] if k in r.__fields__ else None) for k in key_cols}
+                  for r in rows[:10]]
+        conn = psycopg2.connect(host=c["host"], port=c["port"], dbname=c["db"],
+                                user=c["user"], password=c["password"])
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO public.etl_alerts "
+            "(company_id, factory_id, event_type, title, detail_json, row_count, email_sent) "
+            "VALUES (%s,%s,%s,%s,%s::jsonb,%s,%s)",
+            (company_id, factory_id, event_type, label,
+             json.dumps(sample, default=_serial), len(rows), email_sent))
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        log.warning(f"_write_alert_to_db failed: {e}")
+
+
+def notify_email_summary(company_id, factory_id, event_type, key_cols, rows,
+                         conf=None):
+    """
+    1. Try to send an HTML summary email via SMTP.
+    2. Always write the alert to etl_alerts table (portal inbox).
+    Never raises — failures are logged and swallowed.
+    """
+    if not rows:
+        return False
+    email_sent = False
+    cfg = _email_cfg(company_id, factory_id, conf)
+    if cfg:
+        try:
+            import smtplib
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
+
+            label = _EVENT_LABELS.get(event_type, (f"Alert: {event_type}",))[0]
+            subject = (f"[FerroFlux] {label} — {company_id} "
+                       f"({len(rows)} item{'s' if len(rows)!=1 else ''})")
+            html = _build_html(company_id, factory_id, event_type, rows, key_cols)
+
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"]    = f"FerroFlux Alerts <{cfg['user']}>"
+            msg["To"]      = cfg["to"]
+            msg.attach(MIMEText(html, "html", "utf-8"))
+
+            with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as srv:
+                srv.ehlo(); srv.starttls()
+                srv.login(cfg["user"], cfg["password"])
+                srv.sendmail(cfg["user"], [cfg["to"]], msg.as_string())
+
+            log.info(f"email sent to {cfg['to']} — {subject}")
+            email_sent = True
+        except Exception as e:
+            log.warning(f"notify_email_summary SMTP failed (alert saved to portal): {e}")
+    else:
+        log.warning(f"notify_email_summary: no email config for {company_id}/{factory_id}")
+
+    _write_alert_to_db(company_id, factory_id, event_type, rows, key_cols,
+                       email_sent, conf)
+    return email_sent
+
+
+def emit_anomalies_email(df, event_type, key_cols, company_id, factory_id,
+                         conf=None, max_rows=200):
+    """
+    Collect anomaly rows and send a single summary email to the tenant.
+    Returns True if email was sent.
+    """
+    try:
+        rows = df.select(*[c for c in key_cols if c in df.columns]) \
+                 .limit(max_rows).collect()
+    except Exception as e:
+        log.warning(f"emit_anomalies_email collect failed: {e}")
+        return False
+    visible_cols = [c for c in key_cols if c in df.columns]
+    ok = notify_email_summary(company_id, factory_id, event_type,
+                              visible_cols, rows, conf)
+    log.info(f"email anomaly summary {'sent' if ok else 'FAILED'} "
+             f"({len(rows)} rows, event={event_type})")
+    return ok

@@ -109,12 +109,16 @@ print(f"   Processed: {cnt:,} rows | price spikes: {spikes}")
 ec.write_partitioned(df_market_silver, f"{SILVER_PATH}/market_clean", ["year"], company=None)
 ec.save_pg_tenant(df_market_silver, "processed_data.market_clean", PG)
 
-# --- n8n alert: price spikes (Workflow 1 trigger) ---
+# --- alerts: price spikes ---
 if spikes:
     ec.emit_anomalies_from_df(
         spikes_df, "price_spike",
         ["company_id", "factory_id", "date", "steel_price_egypt_egp",
          "price_change_pct", "is_price_spike"])
+    ec.emit_anomalies_email(
+        spikes_df, "price_spike",
+        ["date", "steel_price_egypt_egp", "price_change_pct"],
+        FF_COMPANY or "EZZ", FF_FACTORY or "EZZ_DEMO", PG)
 print("   Saved to silver/market_clean + PostgreSQL")
 
 # ============================================================
@@ -163,12 +167,16 @@ ec.write_partitioned(
     ["company_id", "factory_id", "facility"], company=SCOPE_COMPANY, factory=SCOPE_FACTORY)
 ec.save_pg_tenant(df_prod_silver, "processed_data.production_clean", PG)
 
-# --- n8n alert: efficiency < 70% (Workflow 1 trigger) ---
+# --- alerts: low production efficiency ---
 if underperf:
     ec.emit_anomalies_from_df(
         under_df, "low_efficiency",
         ["company_id", "factory_id", "facility", "production_line",
          "date", "efficiency_pct", "is_underperforming"])
+    ec.emit_anomalies_email(
+        under_df, "low_efficiency",
+        ["facility", "production_line", "date", "efficiency_pct"],
+        FF_COMPANY or "EZZ", FF_FACTORY or "EZZ_DEMO", PG)
 print("   Saved to silver/production_clean + PostgreSQL")
 
 # ============================================================

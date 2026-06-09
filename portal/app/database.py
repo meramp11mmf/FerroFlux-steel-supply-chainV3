@@ -71,6 +71,25 @@ def fetch_one(sql: str, params: tuple = ()):
     return rows[0] if rows else None
 
 
+def execute(sql: str, params: tuple = ()):
+    """Run a parameterised INSERT/UPDATE/DELETE. Returns rows-affected count."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(sql, params)
+        affected = cur.rowcount
+        conn.commit()
+        cur.close()
+        return affected
+    except Exception as e:
+        logger.error(f"execute error: {e} | sql={sql[:120]}")
+        return 0
+    finally:
+        if conn:
+            conn.close()
+
+
 def healthcheck() -> bool:
     try:
         conn = get_db_connection(retries=1)

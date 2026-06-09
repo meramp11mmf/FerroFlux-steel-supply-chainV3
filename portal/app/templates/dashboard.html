@@ -150,6 +150,7 @@ input:focus,select:focus{outline:none;border-color:var(--ember)}
     <div class="sidebar-section">Operations</div>
     <div class="nav-item" data-view="factories"><span class="ic">⌂</span>Factories</div>
     <div class="nav-item" data-view="upload"><span class="ic">↑</span>Upload Data</div>
+    <div class="nav-item" data-view="alerts"><span class="ic">🔔</span>Alerts <span id="alertNavBadge" style="display:none;background:#e53e3e;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px"></span></div>
   </nav>
   <div class="tenant-box">
     <div class="cn" id="tCompany">—</div>
@@ -298,6 +299,19 @@ input:focus,select:focus{outline:none;border-color:var(--ember)}
     </div>
   </section>
 
+  <!-- ALERTS -->
+  <section class="view" id="view-alerts">
+    <div class="row-full">
+      <div class="panel">
+        <div class="panel-hd" style="display:flex;justify-content:space-between;align-items:center">
+          <h3>🔔 ETL Anomaly Alerts</h3>
+          <button class="btn btn-ghost" style="font-size:12px;padding:6px 14px" onclick="markAllSeen()">Mark all as seen</button>
+        </div>
+        <div id="alertsList" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </section>
+
 </main>
 </div><!-- /.app -->
 <div class="toast" id="toast"></div>
@@ -347,7 +361,8 @@ const TITLES={
   regional:['Regional Demand','Orders & revenue by governorate'],
   suppliers:['Suppliers','Supply risk scorecard'],
   factories:['Factories','Manage your registered units'],
-  upload:['Upload Data','Feed your medallion pipeline']
+  upload:['Upload Data','Feed your medallion pipeline'],
+  alerts:['Alerts','ETL anomaly notifications']
 };
 document.querySelectorAll('.nav-item').forEach(el=>{
   el.onclick=()=>{
@@ -623,10 +638,85 @@ function downloadTemplate(){window.open('/api/upload/templates/'+selectedType,'_
 document.getElementById('fGov').innerHTML=GOVS.map(g=>`<option value="${g}">${g.replace(/_/g,' ')}</option>`).join('');
 renderUTypes();
 
+// ── ALERTS VIEW ──────────────────────────────────────────────────────────────
+async function loadAlerts(){
+  const el=document.getElementById('alertsList');
+  el.innerHTML='<p style="color:var(--ash);font-size:13px">Loading…</p>';
+  try{
+    const d=await api('/dashboard/notifications');
+    const items=d.notifications||[];
+    if(!items.length){
+      el.innerHTML='<p style="color:var(--ash);font-size:14px;padding:20px 0">No alerts yet. Run the Silver ETL pipeline to generate alerts.</p>';
+      return;
+    }
+    const COLORS={price_spike:'#e53e3e',low_efficiency:'#c05621'};
+    const ICONS={price_spike:'⚠',low_efficiency:'⚙'};
+    el.innerHTML=items.map(a=>{
+      const col=COLORS[a.event_type]||'#4fd1c5';
+      const ic=ICONS[a.event_type]||'🔔';
+      const ts=new Date(a.created_at).toLocaleString('en-GB');
+      const unseen=!a.seen?'border-left:3px solid '+col+';':'border-left:3px solid transparent;';
+      const emailTag=a.email_sent
+        ?'<span style="color:#68d391;font-size:11px;margin-left:8px">✓ email sent</span>'
+        :'<span style="color:var(--slag);font-size:11px;margin-left:8px">portal only</span>';
+      let detail='';
+      try{
+        const rows=JSON.parse(a.detail_json||'[]');
+        if(rows.length){
+          const keys=Object.keys(rows[0]);
+          detail='<table style="margin-top:8px;font-size:11.5px;border-collapse:collapse;width:100%">'
+            +'<tr>'+keys.map(k=>'<th style="text-align:left;padding:4px 8px;background:rgba(255,255,255,.05);color:var(--slag)">'+k+'</th>').join('')+'</tr>'
+            +rows.slice(0,5).map(r=>'<tr>'+keys.map(k=>'<td style="padding:4px 8px;border-bottom:1px solid var(--line)">'+(r[k]??'—')+'</td>').join('')+'</tr>').join('')
+            +'</table>';
+        }
+      }catch(e){}
+      return `<div style="background:var(--g2);border-radius:6px;padding:14px 16px;margin-bottom:10px;${unseen}" onclick="markSeen(${a.id},this)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="color:${col};font-size:13px;font-weight:700">${ic} ${a.title}</span>
+          <span style="color:var(--slag);font-size:11px;font-family:'JetBrains Mono'">${ts}</span>
+        </div>
+        <div style="color:var(--ash);font-size:12px;margin-top:4px">
+          <b style="color:var(--steel)">${a.row_count}</b> anomaly row(s) detected${emailTag}
+        </div>
+        ${detail}
+      </div>`;
+    }).join('');
+  }catch(e){el.innerHTML='<p style="color:#e53e3e">Failed to load alerts.</p>';}
+}
+
+async function markSeen(id,el){
+  await api('/dashboard/notifications/'+id+'/seen',{method:'POST'});
+  el.style.borderLeftColor='transparent';
+  el.style.opacity='0.6';
+  updateAlertBadge();
+}
+
+async function markAllSeen(){
+  await api('/dashboard/notifications/seen-all',{method:'POST'});
+  document.querySelectorAll('#alertsList > div').forEach(el=>{
+    el.style.borderLeftColor='transparent';el.style.opacity='0.6';
+  });
+  updateAlertBadge();
+}
+
+async function updateAlertBadge(){
+  try{
+    const d=await api('/dashboard/notifications?unseen_only=true');
+    const n=d.unseen||0;
+    const badge=document.getElementById('alertNavBadge');
+    if(n>0){badge.style.display='inline';badge.textContent=n;}
+    else{badge.style.display='none';}
+  }catch(e){}
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
 const LOADERS={overview:loadOverview,production:loadProduction,regional:loadRegional,
-  suppliers:loadSuppliers,factories:loadFactories,upload:loadFactories};
+  suppliers:loadSuppliers,factories:loadFactories,upload:loadFactories,
+  alerts:loadAlerts};
 
 loadOverview();
+updateAlertBadge();
+setInterval(updateAlertBadge,60000);
 </script>
 </body>
 </html>
