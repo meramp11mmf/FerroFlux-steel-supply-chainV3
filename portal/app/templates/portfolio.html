@@ -51,12 +51,14 @@
   .nav-links a{color:var(--ash); transition:color .2s}
   .nav-links a:hover{color:var(--molten)}
   .btn{font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700;
-    padding:11px 20px; border-radius:2px; text-transform:uppercase; letter-spacing:.5px;
-    border:1px solid var(--ember); transition:.2s; cursor:pointer; display:inline-block}
+    padding:11px 22px; border-radius:6px; text-transform:uppercase; letter-spacing:.5px;
+    border:1px solid var(--ember);
+    transition:all .22s cubic-bezier(0.4,0,0.2,1); cursor:pointer; display:inline-block}
   .btn-ember{background:var(--ember); color:#080B10}
-  .btn-ember:hover{background:var(--ember-2); box-shadow:0 0 24px rgba(0,174,239,.5)}
-  .btn-ghost{background:transparent; color:var(--molten); border-color:var(--line)}
-  .btn-ghost:hover{border-color:var(--ember); color:var(--ember-2)}
+  .btn-ember:hover{background:var(--ember-2); box-shadow:0 6px 22px rgba(0,174,239,.45); transform:translateY(-2px)}
+  .btn-ember:active{transform:translateY(0)}
+  .btn-ghost{background:transparent; color:var(--molten); border-color:rgba(255,255,255,.12)}
+  .btn-ghost:hover{border-color:var(--ember); color:var(--ember-2); background:rgba(0,174,239,.06); transform:translateY(-1px)}
   @media(max-width:780px){.nav-links a:not(.btn){display:none}}
 
   /* ---- hero ---- */
@@ -196,7 +198,12 @@
 
 <nav>
   <div class="wrap nav-in">
-    <a href="/" class="brand"><span class="spark"></span>FerroFlux</a>
+    <a href="/" class="brand">
+      <img src="/static/logo.png" alt="FerroFlux" style="height:40px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(0,174,239,.35));transition:filter .3s"
+           onmouseover="this.style.filter='drop-shadow(0 0 18px rgba(0,174,239,.6))'" onmouseout="this.style.filter='drop-shadow(0 0 10px rgba(0,174,239,.35))'"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div style="display:none;align-items:center;gap:10px;font-family:'Anton',sans-serif;font-size:24px;letter-spacing:1px;text-transform:uppercase"><span class="spark"></span>FerroFlux</div>
+    </a>
     <div class="nav-links">
       <a href="#pipeline">Pipeline</a>
       <a href="#topology">Topology</a>
@@ -454,7 +461,11 @@
 <footer>
   <div class="wrap foot-in">
     <div>
-      <div class="brand" style="font-size:20px"><span class="spark"></span>FerroFlux</div>
+      <div class="brand">
+        <img src="/static/logo.png" alt="FerroFlux" style="height:32px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(0,174,239,.3))"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div style="display:none;align-items:center;gap:8px;font-size:20px"><span class="spark"></span>FerroFlux</div>
+      </div>
       <div class="mono" style="margin-top:10px">Big-Data Analytics for Steel Supply-Chain Optimization · V3</div>
     </div>
     <div class="stack">
