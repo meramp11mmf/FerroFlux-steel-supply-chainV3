@@ -1,184 +1,262 @@
-# 🏭 Steel Supply Chain — Data Engineering Platform
+# FerroFlux — Big Data Analytics Platform for the Egyptian Steel Supply Chain
 
-An end-to-end data engineering platform for steel supply chain management, featuring real-time Kafka Streaming, Spark ETL Pipelines, ML Models, Airflow Orchestration, and an interactive Streamlit Dashboard.
-
----
-
-## ⚡ Requirements
-
-| Tool | Version | Download |
-|------|---------|----------|
-| Docker | 24+ | https://docs.docker.com/get-docker/ |
-| Docker Compose | 2.x | Included with Docker Desktop |
-| Python | 3.8+ | https://python.org (for manager.py only) |
-| Git | Any | https://git-scm.com |
-
-> **Windows users:** Make sure WSL 2 is enabled before installing Docker Desktop.
+An end-to-end data engineering and machine learning platform built around EZZ Steel Group, Egypt's largest steel manufacturer. FerroFlux processes over 86,000 rows of historical data through a three-layer ETL pipeline, trains three ML models, and surfaces insights through an interactive web portal and dashboard.
 
 ---
 
-## 🚀 Quick Start
+## What is FerroFlux?
+
+FerroFlux is a multi-tenant Big Data platform designed for Egyptian steel companies. It simulates a real production environment with data flowing from raw CSV files all the way to machine learning predictions, real-time Kafka streaming, and automated anomaly alerts.
+
+**Simulated company:** EZZ Steel Group  
+**3 factories:** Alexandria (ALEX), Suez (SUEZ), Sadat City (SADAT)  
+**24 governorates** covered | **12 suppliers** (domestic and international)
+
+---
+
+## Requirements
+
+| Tool | Version |
+|------|---------|
+| Docker | 24+ |
+| Docker Compose | 2.x |
+| Python | 3.8+ |
+| WSL2 (Windows users) | Enabled |
+
+---
+
+## Quick Start
 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/steel-supply-chain.git
-cd steel-supply-chain
+git clone https://github.com/nourhan-shalaby/FerroFlux-steel-supply-chainV3.git
+cd FerroFlux-steel-supply-chainV3
 ```
 
-### 2. Set up environment variables
-
-```bash
-cp .env.example .env
-```
-
-### 3. Generate a Fernet key (required for Airflow)
-
-```bash
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-Copy the output and paste it into `.env` as the value for `AIRFLOW_FERNET_KEY`.
-
-### 4. Edit credentials (optional for local testing)
-
-Open `.env` and update passwords as needed. The default values work for local development.
-
-> ⚠️ **Never commit your `.env` file to Git — it contains sensitive credentials.**
-
-### 5. Build and start all services
+### 2. Start all services
 
 ```bash
 docker compose up -d --build
 ```
 
-Wait about 2 minutes for all services to initialize, then verify:
+Wait about 2 minutes for everything to initialize, then verify all containers are running:
 
 ```bash
 docker ps --format 'table {{.Names}}\t{{.Status}}'
 ```
 
-All containers should show `Up`.
-
-### 6. Launch the control panel
+### 3. Open the control panel
 
 ```bash
-python3 manager.py
+python manager.py
 ```
 
 ---
 
-## 🗂️ Services & Ports
+## Services & Ports
 
-| Service | Port | Description |
-|---------|------|-------------|
-| Spark Master UI | http://localhost:8081 | Monitor Spark jobs |
-| Airflow UI | http://localhost:8089 | Manage DAGs and pipelines |
-| Streamlit Dashboard | http://localhost:8501 | Interactive data dashboard |
+| Service | URL | Description |
+|---------|-----|-------------|
+| Portal (FastAPI) | http://localhost:8000 | Main web portal and dashboard |
+| Streamlit Dashboard | http://localhost:8501 | Interactive charts and analytics |
+| Airflow | http://localhost:8089 | Pipeline scheduling and monitoring |
+| Spark Master UI | http://localhost:8081 | Spark job monitoring |
+| Kafka UI | http://localhost:8086 | Kafka topic monitoring |
+| PgAdmin | http://localhost:5050 | Database management |
 | PostgreSQL | localhost:5432 | Main database |
-| Kafka | localhost:9092 | Message broker |
+
+**Default credentials:**
+- Airflow: `admin` / `admin123`
+- PgAdmin: `admin@ferroflux.com` / `admin123`
+- Portal: use the "Demo Login" button on the `/login` page
 
 ---
 
-## 🎮 Control Panel (manager.py)
+## Control Panel (manager.py)
 
 ```
 [1] Docker Lifecycle    — Start / Stop / Rebuild containers
 [2] Status Check        — View status of all running services
 [3] ETL Pipelines       — Run Bronze / Silver / Gold data layers
-[4] AI/ML Models        — Run price prediction, demand forecast, supplier risk models
+[4] AI/ML Models        — Run price prediction, demand forecast, supplier risk
 [5] Spark Streaming     — Start real-time data processing from Kafka
 [6] Kafka Operations    — Run producers and verify topics
 [7] Dashboard           — Launch Streamlit dashboard
 [8] System Utilities    — Maintenance and repair tools
-[9] AI Agent (Airflow)  — Trigger and monitor DAGs via REST API
 ```
 
 ---
 
-## 🏗️ Project Structure
+## Data Pipeline (Medallion Architecture)
 
 ```
-steel-supply-chain/
-├── docker-compose.yml          # All service definitions
-├── Dockerfile.spark            # Custom Spark image
-├── manager.py                  # Main control panel
-├── .env.example                # Environment variable template
-├── .env                        # ← Never commit this file
+Raw CSV Files (86,044 rows)
+         ↓
+    Bronze Layer     ←  Ingests raw data as Parquet into raw_data schema
+         ↓
+    Silver Layer     ←  Cleans, enriches, detects anomalies
+         ↓
+    Gold Layer       ←  Builds 6 aggregated tables for analytics & ML
+         ↓
+    ML Models        ←  3 trained models with predictions saved to DB
+```
+
+### Bronze ETL
+Reads five CSV files from `data/raw/` and loads them into PostgreSQL without modification, saving a Parquet copy alongside.
+
+### Silver ETL
+Adds computed columns like price change percentage, production efficiency, and shipment delay flags. When it detects anomalies (sudden price spikes or low efficiency), it fires automatic alerts.
+
+### Gold ETL
+Builds six aggregated tables used by the dashboard and ML models:
+
+| Table | Description |
+|-------|-------------|
+| `daily_kpis` | Daily performance indicators |
+| `monthly_summary` | Monthly revenue and volume summary |
+| `supplier_scorecard` | Supplier performance scores |
+| `regional_demand` | Demand breakdown by governorate |
+| `production_efficiency` | Efficiency per line and shift |
+| `price_features` | Feature-engineered table for price ML model |
+
+---
+
+## Machine Learning Models
+
+### Model 1 — Steel Price Prediction
+Predicts future steel prices based on historical market and production data.  
+**Algorithm:** Random Forest  
+**Results:** MAPE: 5.29% | RMSE: 3,049 EGP
+
+### Model 2 — Weekly Demand Forecasting
+Predicts weekly order volume to support production planning.  
+**Algorithm:** Gradient Boosted Trees  
+**Results:** R²: 0.71 | MAPE: 43.28%
+
+### Model 3 — Supplier Risk Assessment
+Classifies each supplier as low / medium / high risk and assigns a numeric risk score.  
+**Algorithm:** Random Forest Classifier + Regressor  
+**Results:** Accuracy: 94.78% | F1 Score: 0.9468
+
+> **Note:** Gold ETL must run before ML models since Model 1 reads from `analytics.price_features`.
+
+---
+
+## Alert & Notification System
+
+When the Silver ETL detects anomalies in the data:
+1. It attempts to send an HTML email via Gmail SMTP to the address registered for the tenant
+2. Regardless of whether the email succeeds, the alert is saved to the `etl_alerts` database table
+3. Alerts appear on the **Alerts page** inside the Portal, with a badge showing the unread count
+
+This two-layer approach means notifications always reach the portal inbox, even when SMTP is unavailable.
+
+---
+
+## Real-Time Streaming (Kafka)
+
+Four Kafka producers simulate live data feeds:
+
+```
+steel_market_prices   →  new price every  5 seconds
+steel_orders          →  new order  every 10 seconds
+steel_production      →  production every 15 seconds
+steel_shipments       →  shipment   every 20 seconds
+```
+
+---
+
+## Project Structure
+
+```
+FerroFlux-steel-supply-chainV3/
+├── docker-compose.yml
+├── Dockerfile.spark
+├── init_db.sql
+├── 01_multitenant_migration.sql
+├── manager.py
+├── data/
+│   ├── raw/                  ← Original CSV files
+│   └── processed/            ← Parquet output (Bronze / Silver / Gold)
 ├── scripts/
-│   ├── spark_jobs/             # ETL and streaming jobs
+│   ├── spark_jobs/
+│   │   ├── etl_common.py     ← Shared helpers (save_pg_tenant, notifications)
 │   │   ├── bronze_etl.py
 │   │   ├── silver_etl.py
 │   │   ├── gold_etl.py
 │   │   └── streaming_etl.py
-│   ├── ml_jobs/                # Machine learning models
+│   ├── ml_jobs/
 │   │   ├── price_prediction.py
 │   │   ├── demand_forecasting.py
 │   │   └── supplier_risk.py
-│   ├── kafka_producers/        # Data producers
-│   │   ├── market_producer.py
-│   │   ├── orders_producer.py
-│   │   ├── production_producer.py
-│   │   └── shipments_producer.py
+│   ├── kafka_producers/
 │   └── dashboards/
-│       └── app.py              # Streamlit application
-└── dags/                       # Airflow DAGs
+│       └── app.py            ← Streamlit application
+├── portal/
+│   └── app/
+│       ├── main.py
+│       ├── database.py
+│       ├── routers/
+│       └── templates/
+│           ├── dashboard.html
+│           ├── login.html
+│           └── portfolio.html
+└── dags/                     ← Airflow DAGs
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
-### `ByteArraySerializer` error in Spark Streaming
-**Cause:** kafka-clients JAR missing from the driver classpath.  
-**Fix:** Already resolved in the Dockerfile. Rebuild the image:
+**Streamlit not loading:**
 ```bash
-docker compose up -d --build spark-master
+docker compose exec -d spark-master bash -c \
+  "streamlit run /opt/spark/scripts/scripts/dashboards/app.py \
+   --server.port 8501 --server.address 0.0.0.0 --server.headless true"
 ```
 
-### Airflow UI not responding
-**Fix:** Wait 2–3 minutes after `docker compose up`, then check logs:
+**Airflow UI not responding:**  
+Wait 2–3 minutes after `docker compose up`, then check logs:
 ```bash
 docker logs airflow-webserver --tail 50
 ```
 
-### PostgreSQL connection refused
-**Fix:** Make sure `.env` values match `docker-compose.yml`:
+**PostgreSQL connection refused:**
 ```bash
-docker logs postgres --tail 20
+docker logs steel-postgres --tail 20
 ```
 
-### Port already in use
-**Fix:** Find and stop the process using the conflicting port:
+**Stop all services:**
 ```bash
-# Example for port 5432
-sudo lsof -i :5432
-sudo kill -9 <PID>
-```
-
-### On Windows: `docker compose` command not found
-**Fix:** Use Docker Desktop and make sure it is running before executing any commands.
-
----
-
-## 🔄 Shutdown
-
-```bash
-# Stop services and keep all data
+# Stop and keep all data
 docker compose down
 
-# Stop services and delete all data (full reset)
+# Full reset — stops and deletes all data
 docker compose down -v
 ```
 
 ---
 
-## 👥 Contributors
+## Tech Stack
 
-| Name | Role |
-|------|------|
-| Nourhan | Data Engineer & Project Lead |
+| Layer | Technologies |
+|-------|-------------|
+| Compute | Apache Spark 3.4.4 |
+| Streaming | Apache Kafka + Zookeeper |
+| Orchestration | Apache Airflow 2.8 |
+| Storage | PostgreSQL 13 + Parquet |
+| Backend API | FastAPI (Python 3.11) |
+| Dashboard | Streamlit |
+| Infrastructure | Docker Compose (13 containers) |
 
 ---
 
-*Built with Apache Spark 3.4.4 • Apache Kafka • Apache Airflow • PostgreSQL • Streamlit*
+## Author
+
+**Nourhan Saber** — Data Engineer & Project Lead  
+Graduation Project — Big Data Analytics
+
+---
+
+*FerroFlux — Built with Apache Spark · Apache Kafka · Apache Airflow · FastAPI · PostgreSQL · Streamlit*
