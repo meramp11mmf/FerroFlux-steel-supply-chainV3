@@ -20,12 +20,18 @@
 
   /* left brand panel */
   .brandside{position:relative; padding:54px; display:flex; flex-direction:column; justify-content:space-between;
-    background:linear-gradient(160deg,#080B10,#0c0d0f 60%); border-right:1px solid var(--line); overflow:hidden}
+    background:linear-gradient(160deg,#060810,#0a0e15 60%); border-right:1px solid rgba(255,255,255,.05); overflow:hidden}
   .brandside::before{content:""; position:absolute; inset:0;
-    background:radial-gradient(600px 500px at 20% 10%, rgba(0,174,239,.2), transparent 60%)}
+    background:
+      radial-gradient(700px 600px at 10% 5%, rgba(0,174,239,.18), transparent 60%),
+      radial-gradient(400px 300px at 80% 90%, rgba(125,226,255,.06), transparent 60%)}
   .brandside > *{position:relative; z-index:1}
-  .brand{display:flex; align-items:center; gap:12px; font-family:'Anton',sans-serif; font-size:26px;
-    text-transform:uppercase; letter-spacing:1px}
+  .brand{display:flex; align-items:center; gap:14px}
+  .brand-logo-img{height:52px; width:auto; object-fit:contain;
+    filter:drop-shadow(0 0 14px rgba(0,174,239,.5)); transition:filter .3s}
+  .brand-logo-img:hover{filter:drop-shadow(0 0 22px rgba(0,174,239,.7))}
+  .brand-text-fallback{font-family:'Anton',sans-serif;font-size:26px;
+    text-transform:uppercase;letter-spacing:1px;color:#fff;display:none;align-items:center;gap:10px}
   .spark{width:15px;height:15px;border-radius:50%;
     background:radial-gradient(circle at 35% 30%,var(--molten),var(--ember) 60%,#001a2e);
     box-shadow:0 0 22px var(--ember)}
@@ -45,11 +51,11 @@
   .formside{display:flex; align-items:center; justify-content:center; padding:40px}
   .panel{width:100%; max-width:420px}
   .tabs{display:flex; gap:4px; background:var(--graphite-2); border:1px solid var(--line);
-    border-radius:4px; padding:4px; margin-bottom:28px}
+    border-radius:8px; padding:4px; margin-bottom:28px}
   .tab{flex:1; text-align:center; padding:11px; font-family:'JetBrains Mono',monospace; font-size:13px;
-    font-weight:700; letter-spacing:.5px; text-transform:uppercase; border-radius:3px; cursor:pointer;
-    color:var(--ash); transition:.2s}
-  .tab.active{background:var(--ember); color:#080B10}
+    font-weight:700; letter-spacing:.5px; text-transform:uppercase; border-radius:6px; cursor:pointer;
+    color:var(--ash); transition:all .2s cubic-bezier(0.4,0,0.2,1)}
+  .tab.active{background:var(--ember); color:#080B10; box-shadow:0 2px 10px rgba(0,174,239,.3)}
   h2{font-family:'Anton',sans-serif; font-weight:400; font-size:30px; text-transform:uppercase; color:#fff;
     margin-bottom:6px}
   .lead{color:var(--slag); font-size:14px; margin-bottom:24px}
@@ -57,13 +63,16 @@
     text-transform:uppercase; color:var(--slag); margin:14px 0 6px}
   input{width:100%; background:var(--graphite-2); border:1px solid var(--line); border-radius:3px;
     padding:12px 14px; color:#fff; font-family:'Hanken Grotesk'; font-size:15px; transition:.2s}
-  input:focus{outline:none; border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,90,31,.12)}
+  input:focus{outline:none; border-color:var(--ember); box-shadow:0 0 0 3px rgba(0,174,239,.1)}
+  input{border-radius:6px; transition:border-color .18s, box-shadow .18s}
   .row{display:grid; grid-template-columns:1fr 1fr; gap:12px}
   .btn{width:100%; margin-top:24px; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700;
-    padding:14px; border-radius:3px; text-transform:uppercase; letter-spacing:1px; border:none;
-    background:var(--ember); color:#080B10; cursor:pointer; transition:.2s}
-  .btn:hover{background:var(--ember-2); box-shadow:0 0 26px rgba(255,90,31,.4)}
-  .btn:disabled{opacity:.6; cursor:wait}
+    padding:14px; border-radius:8px; text-transform:uppercase; letter-spacing:1px; border:none;
+    background:var(--ember); color:#080B10; cursor:pointer;
+    transition:all .22s cubic-bezier(0.4,0,0.2,1)}
+  .btn:hover{background:var(--ember-2); box-shadow:0 6px 20px rgba(0,174,239,.35); transform:translateY(-1px)}
+  .btn:active{transform:translateY(0)}
+  .btn:disabled{opacity:.55; cursor:wait; transform:none}
   .alt{margin-top:18px; text-align:center; font-size:13px; color:var(--slag)}
   .alt a{color:var(--cyan)}
   .msg{margin-top:18px; padding:13px 15px; border-radius:4px; font-size:13.5px; display:none}
@@ -80,7 +89,11 @@
 <body>
 
 <aside class="brandside">
-  <a href="/" class="brand"><span class="spark"></span>FerroFlux</a>
+  <a href="/" class="brand">
+    <img src="/static/logo.png" alt="FerroFlux" class="brand-logo-img"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <div class="brand-text-fallback"><span class="spark"></span>FerroFlux</div>
+  </a>
   <div>
     <h1>Your factories.<br><span class="hot">Your data.</span><br>Yours alone.</h1>
     <p>Every query in the tenant workspace is scoped to your company by a signed token — strict row-level isolation across the entire medallion stack.</p>

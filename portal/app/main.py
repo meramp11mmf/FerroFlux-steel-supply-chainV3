@@ -20,6 +20,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from starlette.requests import Request
 
 from app.config import settings
@@ -32,7 +33,11 @@ logger = logging.getLogger("portal")
 app = FastAPI(title="FerroFlux — Steel Supply-Chain Platform", version="3.0.0")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
+STATIC_DIR    = Path(__file__).parent / "static"
+STATIC_DIR.mkdir(exist_ok=True)
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # ---- API routers ----
 app.include_router(auth.router,             prefix="/api/auth",             tags=["auth"])
