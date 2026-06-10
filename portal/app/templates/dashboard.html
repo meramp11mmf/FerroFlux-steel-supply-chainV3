@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <style>
 :root{
   --g0:#080B10;--g1:#0f1419;--g2:#161c24;--g3:#1e2630;
@@ -45,18 +46,18 @@ aside{
 
 /* logo / brand block */
 .brand{
-  padding:14px 10px 12px;
+  padding:10px 8px 8px;
   border-bottom:1px solid rgba(255,255,255,.05);
   display:flex;align-items:center;justify-content:center;
   background:rgba(0,174,239,.03)}
 .brand-logo{
-  width:calc(var(--sidebar) - 14px);
-  max-height:145px;
+  width:calc(var(--sidebar) - 16px);
+  height:auto;
   object-fit:contain;
   display:block;
-  filter:drop-shadow(0 0 12px rgba(0,174,239,.3));
+  filter:drop-shadow(0 0 14px rgba(0,174,239,.35));
   transition:filter .3s}
-.brand-logo:hover{filter:drop-shadow(0 0 20px rgba(0,174,239,.55))}
+.brand-logo:hover{filter:drop-shadow(0 0 24px rgba(0,174,239,.6))}
 .brand-fallback{display:none;align-items:center;gap:8px;
   font-family:'Anton',sans-serif;font-size:18px;text-transform:uppercase;
   letter-spacing:1px;color:#fff}
@@ -89,7 +90,9 @@ nav.menu{padding:10px 8px;display:flex;flex-direction:column;gap:1px;flex:1}
   left:-8px;top:50%;transform:translateY(-50%);
   width:3px;height:55%;border-radius:0 2px 2px 0;
   background:var(--ember)}
-.nav-item .ic{width:16px;text-align:center;font-size:13px;opacity:.8}
+.nav-item .ic{width:16px;height:16px;flex-shrink:0;opacity:.7;display:flex;align-items:center}
+.nav-item .ic svg{width:16px;height:16px;stroke-width:1.75;stroke:currentColor;fill:none}
+.nav-item:hover .ic{opacity:1}
 .nav-item.active .ic{opacity:1}
 
 /* tenant box */
@@ -248,14 +251,14 @@ input:focus,select:focus{border-color:var(--ember);box-shadow:0 0 0 3px rgba(0,1
   </div>
   <nav class="menu">
     <div class="sidebar-section">Analytics</div>
-    <div class="nav-item active" data-view="overview"><span class="ic">◧</span>Overview</div>
-    <div class="nav-item" data-view="production"><span class="ic">⚙</span>Production Lines</div>
-    <div class="nav-item" data-view="regional"><span class="ic">◈</span>Regional Demand</div>
-    <div class="nav-item" data-view="suppliers"><span class="ic">▤</span>Suppliers</div>
+    <div class="nav-item active" data-view="overview"><span class="ic"><i data-lucide="layout-dashboard"></i></span>Overview</div>
+    <div class="nav-item" data-view="production"><span class="ic"><i data-lucide="cpu"></i></span>Production Lines</div>
+    <div class="nav-item" data-view="regional"><span class="ic"><i data-lucide="map-pin"></i></span>Regional Demand</div>
+    <div class="nav-item" data-view="suppliers"><span class="ic"><i data-lucide="package"></i></span>Suppliers</div>
     <div class="sidebar-section">Operations</div>
-    <div class="nav-item" data-view="factories"><span class="ic">⌂</span>Factories</div>
-    <div class="nav-item" data-view="upload"><span class="ic">↑</span>Upload Data</div>
-    <div class="nav-item" data-view="alerts"><span class="ic">🔔</span>Alerts <span id="alertNavBadge" style="display:none;background:#e53e3e;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:4px"></span></div>
+    <div class="nav-item" data-view="factories"><span class="ic"><i data-lucide="building-2"></i></span>Factories</div>
+    <div class="nav-item" data-view="upload"><span class="ic"><i data-lucide="upload-cloud"></i></span>Upload Data</div>
+    <div class="nav-item" data-view="alerts"><span class="ic"><i data-lucide="bell"></i></span>Alerts <span id="alertNavBadge" style="display:none;background:#e53e3e;color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;font-family:'JetBrains Mono'"></span></div>
   </nav>
   <div class="tenant-box">
     <div class="cn" id="tCompany">—</div>
@@ -822,6 +825,7 @@ const LOADERS={overview:loadOverview,production:loadProduction,regional:loadRegi
 loadOverview();
 updateAlertBadge();
 setInterval(updateAlertBadge,60000);
+lucide.createIcons();
 </script>
 </body>
 </html>
