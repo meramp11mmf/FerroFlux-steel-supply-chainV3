@@ -1,26 +1,17 @@
-# Render Blueprint — deploy portal + database in one click
-# Docs: https://render.com/docs/blueprint-spec
-
 services:
   - type: web
     name: ferroflux-portal
-    env: docker
+    runtime: docker
     dockerfilePath: ./portal/Dockerfile
     dockerContext: ./portal
     plan: free
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: ferroflux-db
-          property: connectionString
+        sync: false
       - key: PORTAL_SECRET_KEY
         generateValue: true
-      - key: PORTAL_TOKEN_TTL
-        value: '28800'
-
-databases:
-  - name: ferroflux-db
-    databaseName: steel_db
-    user: steel_admin
-    plan: free
+      - key: PORTAL_USER
+        value: admin
+      - key: PORTAL_PASS
+        value: admin123
