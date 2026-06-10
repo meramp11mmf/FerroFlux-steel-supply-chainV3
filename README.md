@@ -76,14 +76,15 @@ python manager.py
 ## Control Panel (manager.py)
 
 ```
-[1] Docker Lifecycle    — Start / Stop / Rebuild containers
-[2] Status Check        — View status of all running services
-[3] ETL Pipelines       — Run Bronze / Silver / Gold data layers
-[4] AI/ML Models        — Run price prediction, demand forecast, supplier risk
-[5] Spark Streaming     — Start real-time data processing from Kafka
-[6] Kafka Operations    — Run producers and verify topics
-[7] Dashboard           — Launch Streamlit dashboard
-[8] System Utilities    — Maintenance and repair tools
+[1] 🐳 Docker Lifecycle      — Start / Stop / Rebuild containers
+[2] 🔍 Status & Row Counts   — View status of all running services
+[3] 🔄 ETL Pipelines         — Run Bronze / Silver / Gold data layers
+[4] 🤖 AI / ML Models        — Run price prediction, demand forecast, supplier risk
+[5] ⚡ Spark Streaming        — Start real-time data processing from Kafka
+[6] 📨 Kafka Operations       — Run producers and verify topics
+[7] 📊 Streamlit Dashboard    — Launch Streamlit dashboard
+[8] 🔧 System Utilities       — Maintenance and repair tools
+[9] 🧠 Airflow AI Agent       — Trigger and monitor DAGs via REST API
 ```
 
 ---
