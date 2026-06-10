@@ -6,7 +6,7 @@
 <title>FerroFlux — Steel Supply-Chain Intelligence Platform</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Hanken+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;800&family=Outfit:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --graphite:#080B10; --graphite-2:#11161D; --graphite-3:#171E27;
@@ -19,7 +19,7 @@
   html{scroll-behavior:smooth}
   body{
     background:var(--graphite); color:var(--steel);
-    font-family:'Hanken Grotesk',sans-serif; line-height:1.55;
+    font-family:'Outfit',sans-serif; line-height:1.65;
     -webkit-font-smoothing:antialiased; overflow-x:hidden;
   }
   /* molten grain + furnace glow backdrop */
@@ -41,7 +41,7 @@
   nav{position:sticky; top:0; z-index:50; backdrop-filter:blur(12px);
     background:rgba(12,13,15,.72); border-bottom:1px solid var(--line)}
   .nav-in{display:flex; align-items:center; justify-content:space-between; height:68px}
-  .brand{display:flex; align-items:center; gap:12px; font-family:'Anton',sans-serif;
+  .brand{display:flex; align-items:center; gap:12px; font-family:'Bricolage Grotesque',sans-serif;
     font-size:24px; letter-spacing:1px; text-transform:uppercase}
   .brand .spark{width:14px; height:14px; border-radius:50%;
     background:radial-gradient(circle at 35% 30%, var(--molten), var(--ember) 60%, #001a2e);
@@ -67,8 +67,8 @@
     text-transform:uppercase; color:var(--ember); margin-bottom:26px;
     display:flex; align-items:center; gap:12px}
   .tag::before{content:""; width:40px; height:1px; background:var(--ember)}
-  h1{font-family:'Anton',sans-serif; font-weight:400; line-height:.94;
-    font-size:clamp(48px,8.5vw,108px); text-transform:uppercase; letter-spacing:-1px;
+  h1{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; line-height:.94;
+    font-size:clamp(48px,8.5vw,108px); letter-spacing:-2.5px;
     color:#fff; max-width:14ch}
   h1 .hot{background:linear-gradient(100deg,var(--ember),var(--molten) 70%);
     -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent}
@@ -82,7 +82,7 @@
   .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
     background:var(--line); border:1px solid var(--line); margin-top:74px; border-radius:3px; overflow:hidden}
   .stat{background:var(--graphite-2); padding:26px 22px}
-  .stat .n{font-family:'Anton',sans-serif; font-size:38px; color:#fff; letter-spacing:.5px}
+  .stat .n{font-family:'Bricolage Grotesque',sans-serif; font-size:38px; color:#fff; letter-spacing:.5px}
   .stat .n span{color:var(--ember)}
   .stat .l{font-size:12px; color:var(--slag); text-transform:uppercase; letter-spacing:1.5px; margin-top:4px}
   @media(max-width:780px){.stats{grid-template-columns:repeat(2,1fr)}}
@@ -91,7 +91,7 @@
   section{padding:96px 0; position:relative}
   .eyebrow{font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:3px;
     text-transform:uppercase; color:var(--cyan); margin-bottom:14px}
-  h2{font-family:'Anton',sans-serif; font-weight:400; text-transform:uppercase;
+  h2{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; text-transform:uppercase;
     font-size:clamp(30px,4.4vw,52px); line-height:1; color:#fff; letter-spacing:-.5px; margin-bottom:18px}
   .sec-intro{max-width:62ch; color:var(--ash); font-size:17px; margin-bottom:50px}
 
@@ -106,7 +106,7 @@
   .b-bronze{background:rgba(205,127,50,.16); color:#cd9b50; border:1px solid rgba(205,127,50,.4)}
   .b-silver{background:rgba(176,190,197,.14); color:#cfd8dc; border:1px solid rgba(176,190,197,.35)}
   .b-gold{background:rgba(255,179,71,.16); color:var(--molten); border:1px solid rgba(255,179,71,.4)}
-  .layer h3{font-family:'Anton',sans-serif; font-weight:400; font-size:26px; color:#fff;
+  .layer h3{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:26px; color:#fff;
     text-transform:uppercase; letter-spacing:.4px}
   .layer p{font-size:15px; color:var(--ash); margin:10px 0 16px}
   .layer ul{list-style:none; font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--steel)}
@@ -125,7 +125,7 @@
   .svc .sd{font-size:12.5px; color:var(--slag); margin-top:3px}
   .net-card{background:linear-gradient(160deg,var(--graphite-2),var(--graphite));
     border:1px solid var(--line); border-radius:4px; padding:30px}
-  .net-card h4{font-family:'Anton',sans-serif; font-weight:400; font-size:22px; text-transform:uppercase;
+  .net-card h4{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:22px; text-transform:uppercase;
     color:#fff; margin-bottom:6px}
   .net-card .netname{font-family:'JetBrains Mono',monospace; color:var(--cyan); font-size:13px; margin-bottom:20px}
   .net-row{display:flex; justify-content:space-between; padding:11px 0; border-top:1px solid var(--line);
@@ -143,7 +143,7 @@
   .mode.cyan::before{background:linear-gradient(90deg,var(--cyan),#3aa89e)}
   .mode .mt{font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:2px;
     text-transform:uppercase; color:var(--slag)}
-  .mode h3{font-family:'Anton',sans-serif; font-weight:400; font-size:30px; color:#fff;
+  .mode h3{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:30px; color:#fff;
     text-transform:uppercase; margin:8px 0 16px}
   .mode ul{list-style:none}
   .mode li{padding:11px 0; border-top:1px solid var(--line); font-size:15px; color:var(--ash); display:flex; gap:12px}
@@ -173,7 +173,7 @@
   .qr-canvas-wrap{background:#fff; padding:12px; border-radius:3px; display:inline-block}
   .qr-canvas-wrap canvas{display:block}
   .qr-meta{text-align:center}
-  .qr-title{font-family:'Anton',sans-serif; font-weight:400; font-size:20px; color:#fff;
+  .qr-title{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:20px; color:#fff;
     text-transform:uppercase; letter-spacing:.5px; display:block}
   .qr-path{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--slag);
     display:block; margin-top:4px; word-break:break-all}
@@ -202,7 +202,7 @@
       <img src="/static/logo.png" alt="FerroFlux" style="height:64px;width:auto;object-fit:contain;filter:drop-shadow(0 0 10px rgba(0,174,239,.35));transition:filter .3s"
            onmouseover="this.style.filter='drop-shadow(0 0 18px rgba(0,174,239,.6))'" onmouseout="this.style.filter='drop-shadow(0 0 10px rgba(0,174,239,.35))'"
            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div style="display:none;align-items:center;gap:10px;font-family:'Anton',sans-serif;font-size:24px;letter-spacing:1px;text-transform:uppercase"><span class="spark"></span>FerroFlux</div>
+      <div style="display:none;align-items:center;gap:10px;font-family:'Bricolage Grotesque',sans-serif;font-size:24px;letter-spacing:1px;text-transform:uppercase"><span class="spark"></span>FerroFlux</div>
     </a>
     <div class="nav-links">
       <a href="#pipeline">Pipeline</a>
@@ -217,7 +217,7 @@
 
 <header class="hero wrap">
   <div class="tag reveal d1">Multi-Tenant · Big-Data · Steel Supply Chain</div>
-  <h1 class="reveal d2">Forging raw <span class="hot">factory telemetry</span> into decisions.</h1>
+  <h1 class="reveal d2">Forging raw <span class="hot"><span style="text-transform:uppercase">factory</span> <span style="text-transform:uppercase">telemetry</span></span> into decisions.</h1>
   <p class="lede reveal d3">FerroFlux is an end-to-end analytics platform for Egyptian steel producers — a Kafka + Spark medallion pipeline, an Airflow-orchestrated batch tier, and an n8n automation layer, all wrapped in a row-isolated multi-tenant portal. Streaming market prices in, KPIs and anomaly alerts out.</p>
   <div class="hero-cta reveal d4">
     <a href="/demo" class="btn btn-ember">Explore the Live Demo →</a>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FerroFlux — Tenant Workspace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;800&family=Outfit:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <style>
@@ -19,8 +19,8 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{background:var(--g0);color:var(--steel);font-family:'Hanken Grotesk',sans-serif;
-  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{background:var(--g0);color:var(--steel);font-family:'Outfit',sans-serif;
+  line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
   background:
     radial-gradient(ellipse 900px 600px at 95% -5%,rgba(0,174,239,.07),transparent 65%),
@@ -59,7 +59,7 @@ aside{
   transition:filter .3s}
 .brand-logo:hover{filter:drop-shadow(0 0 24px rgba(0,174,239,.6))}
 .brand-fallback{display:none;align-items:center;gap:8px;
-  font-family:'Anton',sans-serif;font-size:18px;text-transform:uppercase;
+  font-family:'Bricolage Grotesque',sans-serif;font-size:18px;text-transform:uppercase;
   letter-spacing:1px;color:#fff}
 .spark{width:12px;height:12px;border-radius:50%;flex-shrink:0;
   background:radial-gradient(circle at 35% 30%,var(--molten),var(--ember) 60%,#001a2e);
@@ -111,7 +111,7 @@ nav.menu{padding:10px 8px;display:flex;flex-direction:column;gap:1px;flex:1}
 /* ─── MAIN ─── */
 main{padding:30px 38px 64px;overflow-x:hidden;min-width:0}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;gap:12px}
-.topbar h1{font-family:'Anton',sans-serif;font-weight:400;font-size:36px;
+.topbar h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:36px;
   text-transform:uppercase;color:#fff;line-height:1;letter-spacing:-.5px}
 .topbar .sub{color:var(--slag);font-size:12px;font-family:'JetBrains Mono';margin-top:6px}
 .badge-alert{
@@ -147,8 +147,8 @@ main{padding:30px 38px 64px;overflow-x:hidden;min-width:0}
 .kpi:hover::before{width:4px}
 .kpi.c2::before{background:var(--cyan)}.kpi.c3::before{background:var(--molten)}.kpi.c4::before{background:var(--purple)}
 .kpi .lbl{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--slag)}
-.kpi .val{font-family:'Anton';font-size:30px;color:#fff;margin-top:9px;line-height:1}
-.kpi .unit{font-size:11.5px;color:var(--ash);font-family:'Hanken Grotesk';margin-top:3px}
+.kpi .val{font-family:'Bricolage Grotesque';font-size:30px;color:#fff;margin-top:9px;line-height:1}
+.kpi .unit{font-size:11.5px;color:var(--ash);font-family:'Outfit';margin-top:3px}
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 
 /* ─── PANELS ─── */
@@ -201,7 +201,7 @@ label{display:block;font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:
   text-transform:uppercase;color:var(--slag);margin:14px 0 6px}
 input,select{
   width:100%;background:var(--g2);border:1px solid var(--line);border-radius:6px;
-  padding:11px 13px;color:#fff;font-family:'Hanken Grotesk';font-size:14px;
+  padding:11px 13px;color:#fff;font-family:'Outfit';font-size:14px;
   transition:border-color .18s,box-shadow .18s;outline:none}
 input:focus,select:focus{border-color:var(--ember);box-shadow:0 0 0 3px rgba(0,174,239,.1)}
 .btn{
