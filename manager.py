@@ -23,7 +23,8 @@ SPARK_SUBMIT    = "/opt/spark/bin/spark-submit"
 SCRIPTS_ROOT    = "/opt/spark/scripts/scripts"   # inside container
 AIRFLOW_URL     = "http://localhost:8089/api/v1"
 AIRFLOW_USER    = os.getenv("AIRFLOW_USER",    "admin")
-AIRFLOW_PASS    = os.getenv("AIRFLOW_PASSWORD", "admin123")
+# Require env var — no insecure default
+AIRFLOW_PASS    = os.getenv("AIRFLOW_PASSWORD", "")
 DAG_ID          = "steel_production_etl"
 
 # ── Airflow helper ────────────────────────────────────────────────────────────
@@ -81,8 +82,10 @@ def spark_submit(script_rel, extra_conf="", env_vars=""):
     cmd = (
         f"docker exec -it {env_part} {CONTAINER} "
         f"{SPARK_SUBMIT} "
+        f"--driver-memory 2g "
         f"--conf spark.jars.ivy=/tmp/.ivy2 "
         f"--conf spark.driver.extraJavaOptions=\"-Divy.cache.dir=/tmp/.ivy2 -Divy.home=/tmp/.ivy2\" "
+        f"--conf spark.sql.shuffle.partitions=8 "
         f"{extra_conf} "
         f"{script}"
     )
@@ -312,7 +315,7 @@ def menu_airflow():
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
 def main():
-    os.chdir("/home/nourhan/FerroFlux-steel-supply-chainV3")
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
     menus = {
         "1": menu_docker,

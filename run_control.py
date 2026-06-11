@@ -9,7 +9,8 @@ class AirflowManager:
     def __init__(self):
         self.base_url = "http://localhost:8089/api/v1"
         self.user = os.getenv("AIRFLOW_USER", "admin")
-        self.password = os.getenv("AIRFLOW_PASSWORD", "admin123")
+        # Require env var — no insecure default
+        self.password = os.getenv("AIRFLOW_PASSWORD", "")
         self.auth = HTTPBasicAuth(self.user, self.password)
 
     def trigger_dag(self, dag_id):

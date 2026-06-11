@@ -26,6 +26,10 @@ def _build_database_url() -> str:
     return f"postgresql://{user}:{pwd}@{host}:{port}/{db}"
 
 
+_WEAK_KEYS = {"change-me-in-prod-please-32+chars", "change-me-in-production", ""}
+_WEAK_AIRFLOW_PASSES = {"admin123", ""}
+
+
 class Settings:
     DATABASE_URL: str = _build_database_url()
 
@@ -40,7 +44,8 @@ class Settings:
     # Airflow REST API (auto-trigger ETL after an upload / factory add)
     AIRFLOW_BASE_URL: str = os.getenv("AIRFLOW_BASE_URL", "http://airflow-webserver:8080/api/v1")
     AIRFLOW_USER: str = os.getenv("AIRFLOW_USER", "admin")
-    AIRFLOW_PASS: str = os.getenv("AIRFLOW_PASSWORD", "admin123")
+    # No default — must be set explicitly; startup aborts below if missing/weak
+    AIRFLOW_PASS: str = os.getenv("AIRFLOW_PASSWORD", "")
     ETL_DAG_ID: str = os.getenv("ETL_DAG_ID", "steel_production_etl")
 
     # n8n webhook for portal-side events (e.g. new factory onboarded)
@@ -51,3 +56,16 @@ class Settings:
 
 
 settings = Settings()
+
+# Fail fast on insecure defaults so bad config is caught at container start
+if settings.SECRET_KEY in _WEAK_KEYS or len(settings.SECRET_KEY) < 32:
+    raise RuntimeError(
+        "PORTAL_SECRET_KEY is missing, too short (<32 chars), or still set to the default. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+    )
+
+if settings.AIRFLOW_PASS in _WEAK_AIRFLOW_PASSES:
+    raise RuntimeError(
+        "AIRFLOW_PASSWORD is not set or is still 'admin123'. "
+        "Set a strong password in your .env file."
+    )

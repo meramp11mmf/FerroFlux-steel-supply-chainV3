@@ -13,5 +13,6 @@ services:
         generateValue: true
       - key: PORTAL_USER
         value: admin
+      # Set via Render dashboard — never commit plaintext passwords
       - key: PORTAL_PASS
-        value: admin123
+        sync: false

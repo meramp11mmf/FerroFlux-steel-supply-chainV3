@@ -28,15 +28,17 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("WARN")
 
-PG_URL = "jdbc:postgresql://steel-postgres:5432/steel_db"
-PG_PROPS = {
-    "user": "steel_admin",
-    "password": "steel_pass_2024",
-    "driver": "org.postgresql.Driver"
-}
+# All PostgreSQL connection details sourced from env vars — no hardcoded credentials
+import os as _os
+_pg_host = _os.getenv("PG_HOST", "steel-postgres")
+_pg_port = _os.getenv("PG_PORT", "5432")
+_pg_db   = _os.getenv("PG_DB",   "steel_db")
+_pg_user = _os.getenv("PG_USER", _os.getenv("POSTGRES_USER", "steel_admin"))
+_pg_pass = _os.getenv("PG_PASSWORD", _os.getenv("POSTGRES_PASSWORD", ""))
+PG_URL   = f"jdbc:postgresql://{_pg_host}:{_pg_port}/{_pg_db}"
+PG_PROPS = {"user": _pg_user, "password": _pg_pass, "driver": "org.postgresql.Driver"}
 
 # ── TENANT SCOPE (multi-tenant ML) ───────────────────────────
-import os as _os
 FF_COMPANY = _os.getenv("FF_COMPANY", "").strip() or "EZZ"
 FF_FACTORY = _os.getenv("FF_FACTORY", "").strip() or "EZZ_DEMO"
 _MIN_TRAIN_ROWS = 200   # below this we fall back to a broader scope
@@ -186,12 +188,35 @@ evaluator_acc = MulticlassClassificationEvaluator(
 evaluator_f1 = MulticlassClassificationEvaluator(
     labelCol="risk_label", predictionCol="prediction", metricName="f1"
 )
+evaluator_w_prec = MulticlassClassificationEvaluator(
+    labelCol="risk_label", predictionCol="prediction", metricName="weightedPrecision"
+)
+evaluator_w_recall = MulticlassClassificationEvaluator(
+    labelCol="risk_label", predictionCol="prediction", metricName="weightedRecall"
+)
+# HIGH-risk (label=2) — false negatives here are costly: missing a risky supplier
+evaluator_high_prec = MulticlassClassificationEvaluator(
+    labelCol="risk_label", predictionCol="prediction",
+    metricName="precisionByLabel", metricLabel=2.0
+)
+evaluator_high_recall = MulticlassClassificationEvaluator(
+    labelCol="risk_label", predictionCol="prediction",
+    metricName="recallByLabel", metricLabel=2.0
+)
 
-accuracy = evaluator_acc.evaluate(predictions_clf)
-f1_score = evaluator_f1.evaluate(predictions_clf)
+accuracy      = evaluator_acc.evaluate(predictions_clf)
+f1_score      = evaluator_f1.evaluate(predictions_clf)
+w_precision   = evaluator_w_prec.evaluate(predictions_clf)
+w_recall      = evaluator_w_recall.evaluate(predictions_clf)
+high_precision = evaluator_high_prec.evaluate(predictions_clf)
+high_recall    = evaluator_high_recall.evaluate(predictions_clf)
 
-print(f"   Classification Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)")
-print(f"   F1 Score: {f1_score:.4f}")
+print(f"   Classification Accuracy:    {accuracy:.4f} ({accuracy*100:.2f}%)")
+print(f"   F1 Score (weighted):        {f1_score:.4f}")
+print(f"   Weighted Precision:         {w_precision:.4f}")
+print(f"   Weighted Recall:            {w_recall:.4f}")
+print(f"   HIGH-risk Precision (cl=2): {high_precision:.4f}")
+print(f"   HIGH-risk Recall    (cl=2): {high_recall:.4f}")
 
 # Confusion matrix
 print("\n   Predictions vs Actual:")
@@ -362,9 +387,13 @@ print("\n" + "=" * 60)
 print("MODEL 3: SUPPLIER RISK SCORING - COMPLETE!")
 print("=" * 60)
 print(f"   Classification:")
-print(f"     Algorithm:   PySpark MLlib RandomForest Classifier")
-print(f"     Accuracy:    {accuracy*100:.2f}%")
-print(f"     F1 Score:    {f1_score:.4f}")
+print(f"     Algorithm:        PySpark MLlib RandomForest Classifier")
+print(f"     Accuracy:         {accuracy*100:.2f}%")
+print(f"     F1 Score:         {f1_score:.4f}")
+print(f"     Weighted Prec:    {w_precision:.4f}")
+print(f"     Weighted Recall:  {w_recall:.4f}")
+print(f"     HIGH-risk Prec:   {high_precision:.4f}")
+print(f"     HIGH-risk Recall: {high_recall:.4f}")
 print(f"   Risk Regression:")
 print(f"     Algorithm:   PySpark MLlib RandomForest Regressor")
 print(f"     RMSE:        {rmse:.2f} points")

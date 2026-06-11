@@ -51,12 +51,14 @@ spark.sparkContext.setLogLevel("WARN")
 SILVER_PATH = "/opt/spark/data/processed/silver"
 GOLD_PATH   = "/opt/spark/data/processed/gold"
 
-PG_URL = "jdbc:postgresql://steel-postgres:5432/steel_db"
-PG_PROPS = {
-    "user":     "steel_admin",
-    "password": "steel_pass_2024",
-    "driver":   "org.postgresql.Driver"
-}
+# All PostgreSQL connection details sourced from env vars — no hardcoded credentials
+_pg_host = _os.getenv("PG_HOST", "steel-postgres")
+_pg_port = _os.getenv("PG_PORT", "5432")
+_pg_db   = _os.getenv("PG_DB",   "steel_db")
+_pg_user = _os.getenv("PG_USER", _os.getenv("POSTGRES_USER", "steel_admin"))
+_pg_pass = _os.getenv("PG_PASSWORD", _os.getenv("POSTGRES_PASSWORD", ""))
+PG_URL   = f"jdbc:postgresql://{_pg_host}:{_pg_port}/{_pg_db}"
+PG_PROPS = {"user": _pg_user, "password": _pg_pass, "driver": "org.postgresql.Driver"}
 
 # ======================= LOAD SILVER ======================
 print("\n" + "=" * 50)

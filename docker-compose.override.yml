@@ -24,18 +24,18 @@ services:
       context: ./portal          # build context is the portal folder
       dockerfile: Dockerfile     # portal/Dockerfile (uvicorn entrypoint)
     environment:
-      # FIX: password now matches POSTGRES_PASSWORD (steel_pass_2024)
-      - DATABASE_URL=postgresql://steel_admin:steel_pass_2024@steel-postgres:5432/steel_db
+      # All secrets come from .env — no hardcoded credentials in this file
+      - DATABASE_URL=${DATABASE_URL}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - AIRFLOW_BASE_URL=http://airflow-webserver:8080/api/v1
-      - AIRFLOW_USER=admin
-      - AIRFLOW_PASSWORD=admin123
+      - AIRFLOW_USER=${AIRFLOW_USER}
+      - AIRFLOW_PASSWORD=${AIRFLOW_PASSWORD}
       - ETL_DAG_ID=steel_production_etl
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook/steel-alert
-      # change this in any real deployment — signs tenant tokens
-      - PORTAL_SECRET_KEY=${PORTAL_SECRET_KEY:-change-me-in-production}
-      - ADMIN_USER=admin
-      - ADMIN_PASS=admin123
+      # Must be set in .env — portal aborts at startup if missing or weak
+      - PORTAL_SECRET_KEY=${PORTAL_SECRET_KEY}
+      - ADMIN_USER=${PORTAL_USER:-admin}
+      - ADMIN_PASS=${PORTAL_PASS}
     volumes:
       # live-mount source for dev reloads; drop this in production so the
       # image's baked-in code (COPY app) is what runs.
@@ -57,7 +57,11 @@ services:
       - PG_PORT=5432
       - PG_DB=steel_db
       - PG_USER=steel_admin
-      - PG_PASSWORD=steel_pass_2024
+      - PG_PASSWORD=${POSTGRES_PASSWORD}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
 
   spark-worker:
     environment:
@@ -66,7 +70,11 @@ services:
       - PG_PORT=5432
       - PG_DB=steel_db
       - PG_USER=steel_admin
-      - PG_PASSWORD=steel_pass_2024
+      - PG_PASSWORD=${POSTGRES_PASSWORD}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
 
   # ---- NEW: n8n automation engine (was named in the spec, absent from compose) ----
   n8n:

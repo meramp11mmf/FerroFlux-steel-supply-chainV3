@@ -41,10 +41,17 @@ spark = (SparkSession.builder
     .config("spark.hadoop.dfs.permissions.enabled", "false")
     .config("spark.hadoop.fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem")
     .config("spark.sql.streaming.checkpointLocation", "/tmp/spark-checkpoints")
-    .config("spark.hadoop.parquet.enable.summary-metadata", "false")
+    .config("spark.hadoop.parquet.summary.metadata.level", "NONE")
     .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
+    .config("spark.driver.memory", "2g")
+    .config("spark.sql.shuffle.partitions", "8")
     .getOrCreate())
 spark.sparkContext.setLogLevel("WARN")
+# Silence WindowExec partition warning — intentionally unpartitioned for price_features
+# (see comment above w_date definition for rationale)
+spark.sparkContext._jvm.org.apache.log4j.LogManager \
+    .getLogger("org.apache.spark.sql.execution.window.WindowExec") \
+    .setLevel(spark.sparkContext._jvm.org.apache.log4j.Level.ERROR)
 
 SILVER_PATH = os.getenv("SILVER_PATH", "/opt/spark/data/processed/silver")
 GOLD_PATH = os.getenv("GOLD_PATH", "/opt/spark/data/processed/gold")
@@ -390,7 +397,11 @@ print("\n" + "=" * 50)
 print("TABLE 6 / 6 — price_features (ML input)")
 print("=" * 50)
 
-# Global date window — lags span the full 730-day range without year-boundary resets
+# Global date window — no partitionBy is intentional.
+# Partitioning by year would reset lag_1d/lag_7d/etc. at Jan 1 each year,
+# making the first N rows of every year NULL even when prior-year data exists.
+# Spark will emit a "No Partition Defined for Window" warning — this is expected
+# and acceptable for a 730-row global market table on a single-node cluster.
 w_date = Window.orderBy("date")
 
 price_features = df_mkt \

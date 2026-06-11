@@ -4,6 +4,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import *
+import os
 import time
 from datetime import datetime
 
@@ -31,14 +32,17 @@ spark = (SparkSession.builder
 
 spark.sparkContext.setLogLevel("WARN")
 
-KAFKA_BROKER = "kafka:29092"
+KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 
-PG_URL = "jdbc:postgresql://steel-postgres:5432/steel_db"
-PG_PROPS = {
-    "user": "steel_admin",
-    "password": "steel_pass_2024",
-    "driver": "org.postgresql.Driver"
-}
+_pg_host = os.getenv("PG_HOST", "steel-postgres")
+_pg_port = os.getenv("PG_PORT", "5432")
+_pg_db   = os.getenv("PG_DB",   "steel_db")
+_pg_user = os.getenv("PG_USER", os.getenv("POSTGRES_USER", "steel_admin"))
+_pg_pass = os.getenv("PG_PASSWORD", os.getenv("POSTGRES_PASSWORD", ""))
+
+# All PostgreSQL connection details sourced from env vars — no hardcoded credentials
+PG_URL   = f"jdbc:postgresql://{_pg_host}:{_pg_port}/{_pg_db}"
+PG_PROPS = {"user": _pg_user, "password": _pg_pass, "driver": "org.postgresql.Driver"}
 
 # ============================================================
 # SCHEMA DEFINITIONS (match Kafka JSON messages)
@@ -123,8 +127,28 @@ import os as _os
 _FF_COMPANY = _os.getenv("FF_COMPANY", "EZZ").strip() or "EZZ"
 _FF_FACTORY = _os.getenv("FF_FACTORY", "EZZ_DEMO").strip() or "EZZ_DEMO"
 
+_DLQ_PATH = os.getenv("STREAM_DLQ_PATH", "/opt/spark/data/logs/dead_letter.jsonl")
+
+
+def _write_dlq(df, table_name, error):
+    """Append failed records as JSON to a dead-letter file with table + error context."""
+    import json
+    from datetime import datetime as _dt
+    try:
+        os.makedirs(os.path.dirname(_DLQ_PATH), exist_ok=True)
+        rows = df.limit(500).toJSON().collect()
+        with open(_DLQ_PATH, "a") as fh:
+            for row in rows:
+                entry = {"ts": _dt.utcnow().isoformat(), "table": table_name,
+                         "error": str(error)[:300], "record": json.loads(row)}
+                fh.write(json.dumps(entry) + "\n")
+        print(f"   DLQ: wrote {len(rows)} failed records to {_DLQ_PATH}")
+    except Exception as dlq_err:
+        print(f"   DLQ write also failed: {dlq_err}")
+
+
 def write_to_postgres(df, table_name):
-    """Write a DataFrame to PostgreSQL (tenant-tagged: streaming = demo factory)"""
+    """Write a DataFrame to PostgreSQL; failed records are appended to the DLQ file."""
     try:
         if df.count() > 0:
             # tag streaming rows with the demo tenant if not already present
@@ -134,7 +158,9 @@ def write_to_postgres(df, table_name):
                 df = df.withColumn("factory_id", F.lit(_FF_FACTORY))
             df.write.mode("append").jdbc(PG_URL, table_name, properties=PG_PROPS)
     except Exception as e:
+        # Do not silently drop — persist to DLQ so records can be replayed
         print(f"   ERROR writing to {table_name}: {str(e)[:200]}")
+        _write_dlq(df, table_name, e)
 
 # ============================================================
 # STREAM 1: PRICE ALERTS
@@ -153,8 +179,8 @@ def process_market_batch(batch_df, batch_id):
         .withColumn("usd_rate", F.col("usd_egp_rate").cast("double")) \
         .withColumn("oil_price", F.col("brent_oil_usd").cast("double"))
     
-    # Detect price spikes (>5% change simulation - compare to avg ~42000)
-    avg_price = 42000.0
+    # Baseline loaded from env so alerts stay accurate as market conditions change
+    avg_price = float(os.getenv("STEEL_PRICE_BASELINE", "42000.0"))
     alerts = processed \
         .withColumn("change_pct", F.round((F.col("steel_price") - F.lit(avg_price)) / F.lit(avg_price) * 100, 2)) \
         .withColumn("alert_level",
@@ -179,11 +205,13 @@ def process_market_batch(batch_df, batch_id):
     high_alerts = alerts.filter(F.col("alert_level").isin("HIGH", "CRITICAL")).count()
     print(f"   [Batch {batch_id}] Market: {cnt} events, {high_alerts} high/critical alerts")
 
+# Consumer group + offset policy prevent message loss and duplicate processing
 market_stream = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", KAFKA_BROKER) \
     .option("subscribe", "steel_market_prices") \
     .option("startingOffsets", "latest") \
+    .option("kafka.group.id", "steel-market-alerts") \
     .option("maxOffsetsPerTrigger", 10) \
     .load() \
     .select(F.from_json(F.col("value").cast("string"), market_schema).alias("data")) \
@@ -237,11 +265,13 @@ def process_orders_batch(batch_df, batch_id):
     large = processed.filter(F.col("qty") >= 1000).count()
     print(f"   [Batch {batch_id}] Orders: {total} events, {large} large orders (>=1000 tons)")
 
+# Consumer group + offset policy prevent message loss and duplicate processing
 orders_stream = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", KAFKA_BROKER) \
     .option("subscribe", "steel_orders") \
     .option("startingOffsets", "latest") \
+    .option("kafka.group.id", "steel-orders-tracking") \
     .option("maxOffsetsPerTrigger", 20) \
     .load() \
     .select(F.from_json(F.col("value").cast("string"), orders_schema).alias("data")) \
@@ -297,11 +327,13 @@ def process_production_batch(batch_df, batch_id):
     issues = alerts.filter(F.col("alert") != "NORMAL").count()
     print(f"   [Batch {batch_id}] Production: {cnt} events, {issues} alerts")
 
+# Consumer group + offset policy prevent message loss and duplicate processing
 production_stream = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", KAFKA_BROKER) \
     .option("subscribe", "steel_production") \
     .option("startingOffsets", "latest") \
+    .option("kafka.group.id", "steel-production-monitor") \
     .option("maxOffsetsPerTrigger", 15) \
     .load() \
     .select(F.from_json(F.col("value").cast("string"), production_schema).alias("data")) \
@@ -350,11 +382,13 @@ def process_shipments_batch(batch_df, batch_id):
     delayed = shipment_status.filter(F.col("is_delayed") == True).count()
     print(f"   [Batch {batch_id}] Shipments: {cnt} events, {delayed} delayed")
 
+# Consumer group + offset policy prevent message loss and duplicate processing
 shipments_stream = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", KAFKA_BROKER) \
     .option("subscribe", "steel_shipments") \
     .option("startingOffsets", "latest") \
+    .option("kafka.group.id", "steel-shipments-tracking") \
     .option("maxOffsetsPerTrigger", 10) \
     .load() \
     .select(F.from_json(F.col("value").cast("string"), shipments_schema).alias("data")) \
@@ -400,12 +434,18 @@ for q in spark.streams.active:
     print(f"   {q.name}: isDataAvailable={status.get('isDataAvailable', 'N/A')}, "
           f"isTriggerActive={status.get('isTriggerActive', 'N/A')}")
 
-# Stop all streams
+# Stop all streams — wrap each call; py4j may already be gone after Ctrl+C
 for q in spark.streams.active:
-    q.stop()
+    try:
+        q.stop()
+    except Exception:
+        pass
 
 print("\nAll streams stopped.")
 print(f"Completed at: {datetime.now()}")
 print("=" * 60)
 
-spark.stop()
+try:
+    spark.stop()
+except Exception:
+    pass

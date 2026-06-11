@@ -84,7 +84,14 @@ st.markdown('''
 
 @st.cache_resource
 def get_engine():
-    return create_engine("postgresql+psycopg2://steel_admin:steel_pass_2024@steel-postgres:5432/steel_db", 
+    # Connection URL built from env vars — no hardcoded credentials
+    import os as _os
+    _u = _os.getenv("PG_USER", _os.getenv("POSTGRES_USER", "steel_admin"))
+    _p = _os.getenv("PG_PASSWORD", _os.getenv("POSTGRES_PASSWORD", ""))
+    _h = _os.getenv("PG_HOST", "steel-postgres")
+    _d = _os.getenv("PG_DB", "steel_db")
+    _port = _os.getenv("PG_PORT", "5432")
+    return create_engine(f"postgresql+psycopg2://{_u}:{_p}@{_h}:{_port}/{_d}",
                          pool_size=10, max_overflow=20)
 # Module-level tenant scope; set by the sidebar selector below.
 TENANT = {"company_id": "EZZ", "factory_id": None, "company_name": "EZZ Steel Group",
@@ -167,7 +174,7 @@ if page == "\U0001f3e0 Executive Dashboard":
     st.markdown('''<div class="title-banner"><h1>\U0001f3ed EZZ STEEL - Executive Command Center</h1><p>Real-time Supply Chain Intelligence | Powered by Big Data & AI</p></div>''', unsafe_allow_html=True)
     st.caption('\U0001f4cd ' + T.tenant_banner(TENANT))
 
-    kpis = run_query("SELECT SUM(total_production_tons) as total_production, AVG(avg_efficiency) as avg_efficiency, SUM(total_revenue_egp) as total_revenue, SUM(total_orders) as total_orders, AVG(on_time_delivery_pct) as on_time_pct, SUM(total_co2_kg) as total_co2, SUM(profit_estimate_egp) as total_profit FROM analytics.daily_kpis")
+    kpis = run_query("SELECT SUM(total_production_tons) as total_production, AVG(avg_efficiency) as avg_efficiency, SUM(total_revenue_egp) as total_revenue, SUM(total_orders) as total_orders, AVG(on_time_delivery_pct) as on_time_pct, SUM(total_co2_kg) as total_co2, SUM(profit_estimate_egp) as total_profit FROM analytics.daily_kpis").fillna(0)
 
     c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
@@ -259,6 +266,10 @@ elif page == "\U0001f4c8 Market & Pricing":
         WHERE 1=1 {date_sql} 
         ORDER BY date
     """)
+
+    if len(market) < 2:
+        st.info("No market data found for the selected period. Run the ETL pipeline first (manager.py → ETL Pipelines → Full pipeline).")
+        st.stop()
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -451,8 +462,11 @@ elif page == "\U0001f69b Logistics & Procurement":
     with tab2:
         sup = run_query("SELECT * FROM ml_models.supplier_risk_scores ORDER BY risk_score")
         st.markdown("### AI Supplier Risk Assessment")
-        c1, c2 = st.columns(2)
-        with c1:
+        if sup.empty:
+            st.info("No supplier risk scores found. Run the Supplier Risk ML model first (manager.py → AI/ML Models → Supplier Risk).")
+        else:
+          c1, c2 = st.columns(2)
+          with c1:
             best = sup.iloc[0]
             worst = sup.iloc[-1]
             fig = go.Figure()
@@ -461,7 +475,7 @@ elif page == "\U0001f69b Logistics & Procurement":
             fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100], gridcolor='rgba(0,174,239,0.2)'), bgcolor='rgba(0,0,0,0)', angularaxis=dict(gridcolor='rgba(0,174,239,0.2)')), height=400, legend=dict(orientation="h", yanchor="bottom", y=-0.2))
             fig = apply_dark_theme(fig)
             st.plotly_chart(fig, use_container_width=True)
-        with c2:
+          with c2:
             st.markdown("### Risk Table")
             ds = sup[['supplier_name', 'risk_score', 'risk_level', 'on_time_factor', 'quality_factor']].copy()
             ds.columns = ['Supplier', 'Risk', 'Level', 'On-Time %', 'Quality %']

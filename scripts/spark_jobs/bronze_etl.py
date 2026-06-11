@@ -23,8 +23,10 @@ spark = (SparkSession.builder
     .config("spark.hadoop.dfs.permissions.enabled", "false")
     .config("spark.hadoop.fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem")
     .config("spark.sql.streaming.checkpointLocation", "/tmp/spark-checkpoints")
-    .config("spark.hadoop.parquet.enable.summary-metadata", "false")
+    .config("spark.hadoop.parquet.summary.metadata.level", "NONE")
     .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
+    .config("spark.driver.memory", "2g")
+    .config("spark.sql.shuffle.partitions", "8")
     .getOrCreate())
 
 spark.sparkContext.setLogLevel("WARN")
@@ -33,13 +35,14 @@ spark.sparkContext.setLogLevel("WARN")
 RAW_PATH = "/opt/spark/data/raw"
 BRONZE_PATH = "/opt/spark/data/processed/bronze"
 
-# ------ PostgreSQL Config ------
-PG_URL = "jdbc:postgresql://steel-postgres:5432/steel_db"
-PG_PROPS = {
-    "user": "steel_admin",
-    "password": "steel_pass_2024",
-    "driver": "org.postgresql.Driver"
-}
+# ------ PostgreSQL Config (all values from env — no hardcoded credentials) ------
+_pg_host = os.getenv("PG_HOST", "steel-postgres")
+_pg_port = os.getenv("PG_PORT", "5432")
+_pg_db   = os.getenv("PG_DB",   "steel_db")
+_pg_user = os.getenv("PG_USER", os.getenv("POSTGRES_USER", "steel_admin"))
+_pg_pass = os.getenv("PG_PASSWORD", os.getenv("POSTGRES_PASSWORD", ""))
+PG_URL   = f"jdbc:postgresql://{_pg_host}:{_pg_port}/{_pg_db}"
+PG_PROPS = {"user": _pg_user, "password": _pg_pass, "driver": "org.postgresql.Driver"}
 
 # ── TENANT TAGGING (multi-tenant) ────────────────────────────
 # Bronze CSV data is the EZZ demo dataset by default. Real factory

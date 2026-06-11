@@ -40,7 +40,7 @@ def pg_conf() -> dict:
         "port": os.getenv("PG_PORT", "5432"),
         "db":   os.getenv("PG_DB",   "steel_db"),
         "user": os.getenv("PG_USER", os.getenv("POSTGRES_USER", "steel_admin")),
-        "password": os.getenv("PG_PASSWORD", os.getenv("POSTGRES_PASSWORD", "steel_pass_2024")),
+        "password": os.getenv("PG_PASSWORD", os.getenv("POSTGRES_PASSWORD", "")),
         "driver": "org.postgresql.Driver",
     }
 
@@ -236,7 +236,7 @@ def save_pg_tenant(df, pg_table, conf=None):
     # ---- end schema alignment -----------------------------------------------
 
     if "company_id" not in df.columns or "factory_id" not in df.columns:
-        log.warning(f"{pg_table}: no tenant columns; appending without pre-delete")
+        log.info(f"{pg_table}: global table — appending without per-tenant purge (expected)")
     else:
         try:
             pairs = [(r["company_id"], r["factory_id"])
@@ -245,10 +245,20 @@ def save_pg_tenant(df, pg_table, conf=None):
                 conn = psycopg2.connect(host=c["host"], port=c["port"], dbname=c["db"],
                                         user=c["user"], password=c["password"])
                 cur = conn.cursor()
+                # Use sql.Identifier so the table name is always quoted —
+                # prevents SQL injection if pg_table is ever derived from input
+                from psycopg2 import sql as _sql
+                if "." in pg_table:
+                    _sch, _tbl = pg_table.split(".", 1)
+                    _table_id = _sql.SQL("{}.{}").format(
+                        _sql.Identifier(_sch), _sql.Identifier(_tbl))
+                else:
+                    _table_id = _sql.Identifier(pg_table)
+                _delete_stmt = _sql.SQL(
+                    "DELETE FROM {} WHERE company_id = %s AND factory_id = %s"
+                ).format(_table_id)
                 for company, factory in pairs:
-                    cur.execute(
-                        f"DELETE FROM {pg_table} WHERE company_id = %s AND factory_id = %s",
-                        (company, factory))
+                    cur.execute(_delete_stmt, (company, factory))
                 conn.commit()
                 cur.close()
                 conn.close()
@@ -327,23 +337,35 @@ _EVENT_LABELS = {
 }
 
 def _email_cfg(company_id, factory_id, conf=None):
-    """Read SMTP config from tenant_notifications for the given tenant."""
+    """
+    Look up the tenant's notify_email from tenant_notifications.
+    SMTP credentials always come from system env vars (SMTP_USER / SMTP_PASSWORD)
+    so each tenant only needs to store their To address, not their own SMTP account.
+    Falls back to factory_id=ALL_FACTORIES for company-wide admins.
+    """
     import psycopg2
     c = conf or pg_conf()
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_password = os.getenv("SMTP_PASSWORD", "")
+    if not smtp_user or not smtp_password:
+        return None   # system SMTP not configured — skip email silently
     try:
         conn = psycopg2.connect(host=c["host"], port=c["port"], dbname=c["db"],
                                 user=c["user"], password=c["password"])
         cur = conn.cursor()
+        # Try exact factory match first, then company-wide (ALL_FACTORIES)
         cur.execute(
-            "SELECT notify_email, smtp_host, smtp_port, smtp_user, smtp_password "
-            "FROM public.tenant_notifications "
-            "WHERE company_id=%s AND factory_id=%s AND enabled=TRUE",
-            (company_id, factory_id))
+            "SELECT notify_email FROM public.tenant_notifications "
+            "WHERE company_id=%s AND factory_id IN (%s, 'ALL_FACTORIES') AND enabled=TRUE "
+            "ORDER BY (factory_id = %s) DESC LIMIT 1",
+            (company_id, factory_id, factory_id))
         row = cur.fetchone()
         cur.close(); conn.close()
         if row:
-            return {"to": row[0], "host": row[1], "port": row[2],
-                    "user": row[3], "password": row[4]}
+            return {"to": row[0], "host": smtp_host, "port": smtp_port,
+                    "user": smtp_user, "password": smtp_password}
     except Exception as e:
         log.warning(f"email config lookup failed: {e}")
     return None
@@ -472,7 +494,7 @@ def notify_email_summary(company_id, factory_id, event_type, key_cols, rows,
         except Exception as e:
             log.warning(f"notify_email_summary SMTP failed (alert saved to portal): {e}")
     else:
-        log.warning(f"notify_email_summary: no email config for {company_id}/{factory_id}")
+        log.info(f"email summary skipped — no SMTP config for {company_id}/{factory_id}")
 
     _write_alert_to_db(company_id, factory_id, event_type, rows, key_cols,
                        email_sent, conf)
@@ -494,6 +516,49 @@ def emit_anomalies_email(df, event_type, key_cols, company_id, factory_id,
     visible_cols = [c for c in key_cols if c in df.columns]
     ok = notify_email_summary(company_id, factory_id, event_type,
                               visible_cols, rows, conf)
-    log.info(f"email anomaly summary {'sent' if ok else 'FAILED'} "
+    log.info(f"email anomaly summary {'sent' if ok else 'skipped (no SMTP config)'} "
              f"({len(rows)} rows, event={event_type})")
     return ok
+
+
+def emit_global_alert_all_tenants(df, event_type, key_cols, conf=None, max_rows=200):
+    """
+    Market-wide alert (e.g. price_spike): send the same alert to every tenant
+    registered in tenant_notifications. Used when the event affects all companies
+    equally and the df has no per-tenant partitioning.
+    """
+    import psycopg2
+    c = conf or pg_conf()
+    try:
+        conn = psycopg2.connect(host=c["host"], port=c["port"], dbname=c["db"],
+                                user=c["user"], password=c["password"])
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT DISTINCT company_id, factory_id "
+            "FROM public.tenant_notifications WHERE enabled=TRUE")
+        pairs = cur.fetchall()
+        cur.close(); conn.close()
+    except Exception as e:
+        log.warning(f"emit_global_alert_all_tenants: tenant lookup failed: {e}")
+        return
+    for company_id, factory_id in pairs:
+        emit_anomalies_email(df, event_type, key_cols, company_id, factory_id, conf, max_rows)
+
+
+def emit_anomalies_email_per_tenant(df, event_type, key_cols, conf=None, max_rows=200):
+    """
+    Per-factory alert (e.g. low_efficiency): group the anomaly df by
+    (company_id, factory_id) and send each tenant only their own rows.
+    Requires the df to have company_id and factory_id columns.
+    """
+    try:
+        pairs = [(r["company_id"], r["factory_id"])
+                 for r in df.select("company_id", "factory_id").distinct().collect()]
+    except Exception as e:
+        log.warning(f"emit_anomalies_email_per_tenant: collect failed: {e}")
+        return
+    for company_id, factory_id in pairs:
+        tenant_df = df.filter(
+            (df["company_id"] == company_id) & (df["factory_id"] == factory_id))
+        emit_anomalies_email(tenant_df, event_type, key_cols,
+                             company_id, factory_id, conf, max_rows)

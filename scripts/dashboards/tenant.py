@@ -22,8 +22,15 @@ from sqlalchemy import create_engine, text
 
 @st.cache_resource
 def get_engine():
+    # Connection URL built from env vars — no hardcoded credentials
+    import os as _os
+    _u = _os.getenv("PG_USER", _os.getenv("POSTGRES_USER", "steel_admin"))
+    _p = _os.getenv("PG_PASSWORD", _os.getenv("POSTGRES_PASSWORD", ""))
+    _h = _os.getenv("PG_HOST", "steel-postgres")
+    _d = _os.getenv("PG_DB", "steel_db")
+    _port = _os.getenv("PG_PORT", "5432")
     return create_engine(
-        "postgresql+psycopg2://steel_admin:steel_pass_2024@steel-postgres:5432/steel_db",
+        f"postgresql+psycopg2://{_u}:{_p}@{_h}:{_port}/{_d}",
         pool_size=10, max_overflow=20
     )
 
@@ -42,7 +49,11 @@ def load_factories(company_id):
     """Return list of (factory_id, factory_name) for a company."""
     try:
         df = pd.read_sql(
-            text("SELECT factory_id, factory_name FROM tenants.factories WHERE company_id = :c ORDER BY factory_name"),
+            text(
+                "SELECT factory_id, factory_name FROM tenants.factories "
+                "WHERE company_id = :c AND factory_id != 'ALL_FACTORIES' "
+                "ORDER BY factory_name"
+            ),
             get_engine(), params={"c": company_id})
         return list(df.itertuples(index=False, name=None))
     except Exception:

@@ -19,7 +19,8 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
 from datetime import datetime
-import sys, os
+import sys
+import os
 
 # make sure sibling module is importable regardless of CWD
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -42,8 +43,10 @@ spark = (SparkSession.builder
     .config("spark.hadoop.dfs.permissions.enabled", "false")
     .config("spark.hadoop.fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem")
     .config("spark.sql.streaming.checkpointLocation", "/tmp/spark-checkpoints")
-    .config("spark.hadoop.parquet.enable.summary-metadata", "false")
+    .config("spark.hadoop.parquet.summary.metadata.level", "NONE")
     .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
+    .config("spark.driver.memory", "2g")
+    .config("spark.sql.shuffle.partitions", "8")
     .getOrCreate())
 spark.sparkContext.setLogLevel("WARN")
 
@@ -80,7 +83,11 @@ print("=" * 50)
 df_market = read_bronze("market_prices")
 print(f"   Read {df_market.count():,} rows from bronze")
 
-df_market_base = df_market.withColumn("year", F.year("date"))
+# Drop rows with NULL date before any window function — NULL dates produce
+# unpredictable sort order and corrupt rolling averages downstream
+df_market_base = df_market \
+    .filter(F.col("date").isNotNull()) \
+    .withColumn("year", F.year("date"))
 w_market = Window.partitionBy("company_id", "factory_id", "year").orderBy("date")
 w7 = w_market.rowsBetween(-6, 0)
 w30 = w_market.rowsBetween(-29, 0)
@@ -115,10 +122,15 @@ if spikes:
         spikes_df, "price_spike",
         ["company_id", "factory_id", "date", "steel_price_egypt_egp",
          "price_change_pct", "is_price_spike"])
-    ec.emit_anomalies_email(
-        spikes_df, "price_spike",
-        ["date", "steel_price_egypt_egp", "price_change_pct"],
-        FF_COMPANY or "EZZ", FF_FACTORY or "EZZ_DEMO", PG)
+    if FF_COMPANY:
+        # Tenant-scoped run: alert only this tenant
+        ec.emit_anomalies_email(spikes_df, "price_spike",
+            ["date", "steel_price_egypt_egp", "price_change_pct"],
+            FF_COMPANY, FF_FACTORY or "ALL_FACTORIES", PG)
+    else:
+        # Full run: market price is global — send to every registered tenant
+        ec.emit_global_alert_all_tenants(spikes_df, "price_spike",
+            ["date", "steel_price_egypt_egp", "price_change_pct"], PG)
 print("   Saved to silver/market_clean + PostgreSQL")
 
 # ============================================================
@@ -148,9 +160,12 @@ df_prod_silver = df_prod \
     .withColumn("gas_per_ton",
         F.when(F.col("actual_tons") > 0, F.round(F.col("natural_gas_m3") / F.col("actual_tons"), 2)).otherwise(0)) \
     .withColumn("estimated_energy_cost_egp",
+        # Fallback rates loaded from env so they stay current (Egypt 2024+: elec ~3.5 EGP/kWh, USD/EGP ~50)
         F.round(
-            F.col("energy_kwh") * F.coalesce(F.col("electricity_price_egp_kwh"), F.lit(1.5)) +
-            F.col("natural_gas_m3") * F.coalesce(F.col("natural_gas_price_usd"), F.lit(3.0)) * F.coalesce(F.col("usd_egp_rate"), F.lit(30.0)),
+            F.col("energy_kwh") * F.coalesce(F.col("electricity_price_egp_kwh"),
+                F.lit(float(os.getenv("ELECTRICITY_COST_EGP", "3.5")))) +
+            F.col("natural_gas_m3") * F.coalesce(F.col("natural_gas_price_usd"), F.lit(3.0)) *
+                F.coalesce(F.col("usd_egp_rate"), F.lit(float(os.getenv("USD_EGP_RATE", "50.0")))),
             2)) \
     .withColumn("shift_rank", shift_rank_expr) \
     .withColumn("is_underperforming", F.when(F.col("efficiency_pct") < 70, 1).otherwise(0)) \
@@ -173,10 +188,16 @@ if underperf:
         under_df, "low_efficiency",
         ["company_id", "factory_id", "facility", "production_line",
          "date", "efficiency_pct", "is_underperforming"])
-    ec.emit_anomalies_email(
-        under_df, "low_efficiency",
-        ["facility", "production_line", "date", "efficiency_pct"],
-        FF_COMPANY or "EZZ", FF_FACTORY or "EZZ_DEMO", PG)
+    if FF_COMPANY:
+        # Tenant-scoped run: alert only this factory
+        ec.emit_anomalies_email(under_df, "low_efficiency",
+            ["facility", "production_line", "date", "efficiency_pct"],
+            FF_COMPANY, FF_FACTORY or "ALL_FACTORIES", PG)
+    else:
+        # Full run: group by factory and send each tenant only their own data
+        ec.emit_anomalies_email_per_tenant(under_df, "low_efficiency",
+            ["company_id", "factory_id", "facility", "production_line",
+             "date", "efficiency_pct"], PG)
 print("   Saved to silver/production_clean + PostgreSQL")
 
 # ============================================================
@@ -290,7 +311,8 @@ df_rawmat_silver = df_rawmat \
     .join(df_market_fx, df_rawmat["purchase_date"] == df_market_fx["m_date"], "left") \
     .drop("m_date") \
     .withColumn("total_landed_cost_egp",
-        F.round(F.col("total_landed_cost_usd") * F.coalesce(F.col("usd_rate_at_purchase"), F.lit(30.0)), 2)) \
+        F.round(F.col("total_landed_cost_usd") * F.coalesce(F.col("usd_rate_at_purchase"),
+            F.lit(float(os.getenv("USD_EGP_RATE", "50.0")))), 2)) \
     .withColumn("days_late",
         F.when(F.col("actual_delivery").isNotNull() & F.col("expected_delivery").isNotNull(),
             F.datediff(F.col("actual_delivery"), F.col("expected_delivery"))).otherwise(0)) \
@@ -298,7 +320,8 @@ df_rawmat_silver = df_rawmat \
         F.when(F.col("actual_delivery").isNotNull() & F.col("purchase_date").isNotNull(),
             F.datediff(F.col("actual_delivery"), F.col("purchase_date"))).otherwise(0)) \
     .withColumn("price_per_ton_egp",
-        F.round(F.col("price_per_ton_usd") * F.coalesce(F.col("usd_rate_at_purchase"), F.lit(30.0)), 2)) \
+        F.round(F.col("price_per_ton_usd") * F.coalesce(F.col("usd_rate_at_purchase"),
+            F.lit(float(os.getenv("USD_EGP_RATE", "50.0")))), 2)) \
     .drop("loaded_at") \
     .withColumn("loaded_at", F.current_timestamp())
 

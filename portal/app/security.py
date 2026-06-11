@@ -22,14 +22,11 @@ from app.config import settings
 logger = logging.getLogger("portal.security")
 
 
-# ---------------- password hashing (bcrypt w/ sha256 fallback) ----------
+# ---------------- password hashing (bcrypt only — SHA-256 fallback removed) ----------
 def hash_password(password: str) -> str:
-    try:
-        import bcrypt
-        return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-    except Exception:
-        salt = "ferroflux_static_salt"
-        return "sha256$" + hashlib.sha256((salt + password).encode()).hexdigest()
+    # bcrypt is a required dependency; no insecure fallback
+    import bcrypt
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(password: str, stored_hash: str) -> bool:
@@ -37,15 +34,8 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return False
     if stored_hash == "PLACEHOLDER_SET_BY_PORTAL":
         return password == settings.ADMIN_PASS
-    if stored_hash.startswith("sha256$"):
-        salt = "ferroflux_static_salt"
-        return hmac.compare_digest(
-            stored_hash, "sha256$" + hashlib.sha256((salt + password).encode()).hexdigest())
-    try:
-        import bcrypt
-        return bcrypt.checkpw(password.encode(), stored_hash.encode())
-    except Exception:
-        return False
+    import bcrypt
+    return bcrypt.checkpw(password.encode(), stored_hash.encode())
 
 
 # ---------------- signed token (HMAC-SHA256, no external dep) -----------
@@ -99,11 +89,12 @@ class TenantContext:
         Returns ("company_id = %s [AND factory_id = %s]", (..)).
         The caller appends this to its own query so isolation is
         applied with bound parameters (no string interpolation).
+        ALL_FACTORIES is the sentinel for company-wide scope — skip factory filter.
         """
         p = f"{alias}." if alias else ""
         frag = f"{p}company_id = %s"
         params = [self.company_id]
-        if self.factory_id:
+        if self.factory_id and self.factory_id != "ALL_FACTORIES":
             frag += f" AND {p}factory_id = %s"
             params.append(self.factory_id)
         return frag, tuple(params)

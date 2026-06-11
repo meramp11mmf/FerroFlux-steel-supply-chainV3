@@ -5,6 +5,8 @@
 # is the only thing the dashboard trusts for company/factory scope.
 # ============================================================
 import logging
+import secrets
+import string
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr, constr
 
@@ -101,7 +103,9 @@ async def register(req: RegisterRequest):
     base = "".join(ch for ch in req.factory_name.upper() if ch.isalnum())[:12] or "FACTORY"
     company_id = base
     factory_id = f"{base}_MAIN"
-    temp_password = "changeme123"
+    # Unique 16-char password per registration — never a shared default
+    _alpha = string.ascii_letters + string.digits + "!@#$%^&*"
+    temp_password = "".join(secrets.choice(_alpha) for _ in range(16))
 
     conn = None
     try:
@@ -122,6 +126,16 @@ async def register(req: RegisterRequest):
             INSERT INTO tenants.users (username, password_hash, company_id, factory_id, role)
             VALUES (%s, %s, %s, %s, 'manager') ON CONFLICT (username) DO NOTHING
         """, (req.email, hash_password(temp_password), company_id, factory_id))
+        # Auto-subscribe the new tenant to email alerts using the system SMTP sender
+        cur.execute("""
+            INSERT INTO public.tenant_notifications
+                (company_id, factory_id, notify_email, smtp_user, smtp_password, enabled)
+            VALUES (%s, %s, %s, '', '', TRUE)
+            ON CONFLICT (company_id, factory_id) DO UPDATE
+                SET notify_email = EXCLUDED.notify_email,
+                    enabled      = TRUE,
+                    updated_at   = NOW()
+        """, (company_id, factory_id, req.email))
         conn.commit()
         cur.close()
         return {"status": "success",
