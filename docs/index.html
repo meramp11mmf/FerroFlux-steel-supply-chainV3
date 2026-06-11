@@ -399,8 +399,12 @@
 
 <script>
 (function(){
-  var PATHS = ['/', '/demo', '/login'];
-  var _urls  = ['', '', ''];
+  var FIXED_URLS = [
+    'https://nourhan-shalaby.github.io/FerroFlux-steel-supply-chainV3/',
+    'https://ferroflux-steel-supply-chainv3-kn7gtwdhdn6zkwskvykruc.streamlit.app',
+    'https://ferroflux-steel-supply-chainv3-kn7gtwdhdn6zkwskvykruc.streamlit.app'
+  ];
+  var _urls = FIXED_URLS.slice();
 
   function qrSrc(url, size){
     return 'https://api.qrserver.com/v1/create-qr-code/'
@@ -413,11 +417,11 @@
   }
 
   function buildAll(){
-    var raw = document.getElementById('qrBase').value.trim();
-    var base = (raw || window.location.origin).replace(/\/+$/, '');
-    PATHS.forEach(function(p, i){
-      var url = base + p;
-      _urls[i] = url;
+    var custom = document.getElementById('qrBase').value.trim().replace(/\/+$/, '');
+    _urls[0] = custom || FIXED_URLS[0];
+    _urls[1] = FIXED_URLS[1];
+    _urls[2] = FIXED_URLS[2];
+    _urls.forEach(function(url, i){
       document.getElementById('qrImg' + i).src = qrSrc(url, 200);
       document.getElementById('qrP'   + i).textContent = url;
     });
@@ -449,7 +453,7 @@
     });
   };
 
-  document.getElementById('qrBase').value = window.location.origin;
+  document.getElementById('qrBase').value = FIXED_URLS[0];
   buildAll();
   document.getElementById('qrRegen').addEventListener('click', buildAll);
   document.getElementById('qrBase').addEventListener('keydown', function(e){
