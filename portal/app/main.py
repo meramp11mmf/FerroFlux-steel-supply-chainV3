@@ -97,6 +97,11 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+
 @app.get("/app", response_class=HTMLResponse)
 async def tenant_app(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})

@@ -51,6 +51,13 @@ class Settings:
     # n8n webhook for portal-side events (e.g. new factory onboarded)
     N8N_WEBHOOK_URL: str = os.getenv("N8N_WEBHOOK_URL", "").strip()
 
+    # SMTP for password-reset emails (Gmail recommended)
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASS: str = os.getenv("SMTP_PASS", "")
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "465"))
+    PORTAL_BASE_URL: str = os.getenv("PORTAL_BASE_URL", "https://nourhan44-ferroflux-portal.hf.space")
+
     # Kafka (for the public live-demo open stream, if wired)
     KAFKA_BOOTSTRAP: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 

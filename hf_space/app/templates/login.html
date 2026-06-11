@@ -108,7 +108,7 @@
 
 <main class="formside">
   <div class="panel">
-    <div class="tabs">
+    <div class="tabs" id="mainTabs">
       <div class="tab active" id="tabLogin" onclick="show('login')">Sign In</div>
       <div class="tab" id="tabReg" onclick="show('register')">Register</div>
     </div>
@@ -122,8 +122,9 @@
       <label>Password</label>
       <input id="lPass" type="password" autocomplete="current-password" placeholder="••••••••">
       <button class="btn" id="loginBtn" onclick="doLogin()">Enter Workspace</button>
-      <div class="alt">No workspace yet? <a onclick="show('register')">Register your company →</a></div>
-      <div class="demohint">Demo login &nbsp;·&nbsp; <b>admin</b> / <b>admin123</b> &nbsp;— or <a class="mono" style="color:var(--cyan)" onclick="doDemo()">enter as guest</a></div>
+      <div class="alt">No workspace yet? <a onclick="show('register')" style="cursor:pointer">Register your company →</a></div>
+      <div class="alt" style="margin-top:10px"><a onclick="show('forgot')" style="cursor:pointer;color:var(--slag)">Forgot password?</a></div>
+      <div class="demohint">Demo login &nbsp;·&nbsp; <b>admin</b> / use your PORTAL_PASS &nbsp;— or <a class="mono" style="color:var(--cyan);cursor:pointer" onclick="doDemo()">enter as guest</a></div>
     </section>
 
     <!-- REGISTER -->
@@ -140,8 +141,33 @@
         <div><label>Email</label><input id="rEmail" type="email" placeholder="ops@asw.com"></div>
         <div><label>Phone</label><input id="rPhone" placeholder="+20 100 000 0000"></div>
       </div>
+      <label>Password</label>
+      <input id="rPass" type="password" placeholder="Min 8 characters">
+      <label>Confirm Password</label>
+      <input id="rPass2" type="password" placeholder="Repeat password">
       <button class="btn" id="regBtn" onclick="doRegister()">Create Workspace</button>
-      <div class="alt">Already onboarded? <a onclick="show('login')">Sign in →</a></div>
+      <div class="alt">Already onboarded? <a onclick="show('login')" style="cursor:pointer">Sign in →</a></div>
+    </section>
+
+    <!-- FORGOT PASSWORD -->
+    <section id="forgotForm" class="hide">
+      <h2>Reset Password</h2>
+      <p class="lead">Enter your registered email and we'll send you a reset link.</p>
+      <label>Email</label>
+      <input id="fEmail" type="email" placeholder="ops@asw.com">
+      <button class="btn" id="forgotBtn" onclick="doForgot()">Send Reset Link</button>
+      <div class="alt"><a onclick="show('login')" style="cursor:pointer">← Back to Sign In</a></div>
+    </section>
+
+    <!-- RESET PASSWORD (shown when ?token= in URL) -->
+    <section id="resetForm" class="hide">
+      <h2>New Password</h2>
+      <p class="lead">Choose a strong new password for your account.</p>
+      <label>New Password</label>
+      <input id="npPass" type="password" placeholder="Min 8 characters">
+      <label>Confirm Password</label>
+      <input id="npPass2" type="password" placeholder="Repeat password">
+      <button class="btn" id="resetBtn" onclick="doReset()">Update Password</button>
     </section>
 
     <div class="msg" id="msg"></div>
@@ -149,14 +175,21 @@
 </main>
 
 <script>
+const SECTIONS = ['login','register','forgot','reset'];
+
 function show(which){
-  const login = which==='login';
-  document.getElementById('loginForm').classList.toggle('hide', !login);
-  document.getElementById('registerForm').classList.toggle('hide', login);
-  document.getElementById('tabLogin').classList.toggle('active', login);
-  document.getElementById('tabReg').classList.toggle('active', !login);
+  SECTIONS.forEach(s=>{
+    document.getElementById(s+'Form').classList.toggle('hide', s!==which);
+  });
+  const tabs = document.getElementById('mainTabs');
+  tabs.style.display = (which==='forgot'||which==='reset') ? 'none' : '';
+  if(which==='login'||which==='register'){
+    document.getElementById('tabLogin').classList.toggle('active', which==='login');
+    document.getElementById('tabReg').classList.toggle('active', which==='register');
+  }
   hideMsg();
 }
+
 function msg(text, ok=false, extra=''){
   const m=document.getElementById('msg');
   m.className='msg '+(ok?'ok':'err');
@@ -165,7 +198,6 @@ function msg(text, ok=false, extra=''){
 function hideMsg(){document.getElementById('msg').className='msg';}
 
 function store(data){
-  // real server-served page: persist token + user for the SPA shell
   localStorage.setItem('ff_token', data.token);
   localStorage.setItem('ff_user', JSON.stringify(data.user||{}));
 }
@@ -173,7 +205,7 @@ function store(data){
 async function post(url, body){
   const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
   const j = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error((j && j.detail) ? (typeof j.detail==='string'?j.detail:JSON.stringify(j.detail)) : ('HTTP '+r.status));
+  if(!r.ok) throw new Error((j&&j.detail)?(typeof j.detail==='string'?j.detail:JSON.stringify(j.detail)):('HTTP '+r.status));
   return j;
 }
 
@@ -198,6 +230,10 @@ async function doDemo(){
 }
 
 async function doRegister(){
+  const pass  = document.getElementById('rPass').value;
+  const pass2 = document.getElementById('rPass2').value;
+  if(pass.length < 8){ msg('Password must be at least 8 characters.'); return; }
+  if(pass !== pass2){ msg('Passwords do not match.'); return; }
   const btn=document.getElementById('regBtn'); btn.disabled=true;
   try{
     const j = await post('/api/auth/register', {
@@ -205,18 +241,46 @@ async function doRegister(){
       contact_name: document.getElementById('rContact').value.trim(),
       email:        document.getElementById('rEmail').value.trim(),
       phone:        document.getElementById('rPhone').value.trim(),
-      city:         document.getElementById('rCity').value.trim()
+      city:         document.getElementById('rCity').value.trim(),
+      password:     pass
     });
-    msg('Workspace created. Sign in with the credentials below:', true,
-        'username: '+j.login_username+'  ·  password: '+j.temp_password);
-    document.getElementById('lUser').value = j.login_username;
-    setTimeout(()=>show('login'), 2600);
+    msg('Workspace created! You can now sign in with your email and password.', true);
+    document.getElementById('lUser').value = document.getElementById('rEmail').value.trim();
+    setTimeout(()=>show('login'), 2000);
   }catch(e){ msg('Registration failed: '+e.message); }
   finally{ btn.disabled=false; }
 }
 
-// allow Enter to submit login
+async function doForgot(){
+  const btn=document.getElementById('forgotBtn'); btn.disabled=true;
+  try{
+    await post('/api/auth/forgot-password', {email: document.getElementById('fEmail').value.trim()});
+    msg('If that email is registered, a reset link has been sent. Check your inbox.', true);
+  }catch(e){ msg('Error: '+e.message); }
+  finally{ btn.disabled=false; }
+}
+
+async function doReset(){
+  const pass  = document.getElementById('npPass').value;
+  const pass2 = document.getElementById('npPass2').value;
+  if(pass.length < 8){ msg('Password must be at least 8 characters.'); return; }
+  if(pass !== pass2){ msg('Passwords do not match.'); return; }
+  const token = new URLSearchParams(window.location.search).get('token') || '';
+  const btn=document.getElementById('resetBtn'); btn.disabled=true;
+  try{
+    await post('/api/auth/reset-password', {token, password: pass});
+    msg('Password updated! Redirecting to sign in…', true);
+    setTimeout(()=>{ window.location.href='/login'; }, 1800);
+  }catch(e){ msg('Error: '+e.message); }
+  finally{ btn.disabled=false; }
+}
+
 document.getElementById('lPass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+// Auto-show reset form if ?token= is in URL
+if(new URLSearchParams(window.location.search).get('token')){
+  show('reset');
+}
 </script>
 </body>
 </html>

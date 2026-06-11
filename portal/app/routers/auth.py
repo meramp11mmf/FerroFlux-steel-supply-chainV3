@@ -12,7 +12,8 @@ from pydantic import BaseModel, EmailStr, constr
 
 from app.database import get_db_connection, fetch_one
 from app.config import settings
-from app.security import hash_password, verify_password, issue_token
+from app.security import hash_password, verify_password, issue_token, issue_reset_token, verify_reset_token
+from app.email_utils import send_reset_email
 
 router = APIRouter()
 logger = logging.getLogger("portal.auth")
@@ -29,6 +30,16 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     phone: constr(strip_whitespace=True, min_length=3, max_length=40)
     city: constr(strip_whitespace=True, min_length=2, max_length=40)
+    password: constr(min_length=8, max_length=200)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: constr(min_length=8, max_length=200)
 
 
 def _lookup_user(username: str):
@@ -125,7 +136,7 @@ async def register(req: RegisterRequest):
         cur.execute("""
             INSERT INTO tenants.users (username, password_hash, company_id, factory_id, role)
             VALUES (%s, %s, %s, %s, 'manager') ON CONFLICT (username) DO NOTHING
-        """, (req.email, hash_password(temp_password), company_id, factory_id))
+        """, (req.email, hash_password(req.password), company_id, factory_id))
         # Auto-subscribe the new tenant to email alerts using the system SMTP sender
         cur.execute("""
             INSERT INTO public.tenant_notifications
@@ -139,16 +150,54 @@ async def register(req: RegisterRequest):
         conn.commit()
         cur.close()
         return {"status": "success",
-                "message": f"Workspace created for {req.factory_name}. Log in with your "
-                           f"email and the temporary password to upload your data.",
+                "message": f"Workspace created for {req.factory_name}. You can now sign in with your email and password.",
                 "company_id": company_id, "factory_id": factory_id,
-                "login_username": req.email, "temp_password": temp_password}
+                "login_username": req.email}
     except Exception as e:
         logger.error(f"register error: {e}")
         raise HTTPException(status_code=500, detail="Registration failed — please try again.")
     finally:
         if conn:
             conn.close()
+
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest):
+    user = fetch_one("SELECT username FROM tenants.users WHERE username = %s", (req.email,))
+    if user:
+        token = issue_reset_token(req.email)
+        link = f"{settings.PORTAL_BASE_URL}/reset-password?token={token}"
+        send_reset_email(req.email, link)
+    # Always return success to avoid email enumeration
+    return {"status": "success", "message": "If that email is registered, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest):
+    email = verify_reset_token(req.token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Reset link is invalid or has expired.")
+    updated = 0
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE tenants.users SET password_hash = %s WHERE username = %s",
+            (hash_password(req.password), email)
+        )
+        updated = cur.rowcount
+        conn.commit()
+        cur.close()
+    except Exception as e:
+        logger.error(f"reset_password error: {e}")
+        raise HTTPException(status_code=500, detail="Could not update password.")
+    finally:
+        if conn:
+            conn.close()
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return {"status": "success", "message": "Password updated. You can now sign in."}
 
 
 @router.get("/demo")

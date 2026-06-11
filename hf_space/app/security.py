@@ -107,6 +107,30 @@ class TenantContext:
         }
 
 
+def issue_reset_token(email: str) -> str:
+    payload = {"sub": email, "type": "reset", "exp": int(time.time()) + 3600}
+    raw = json.dumps(payload, separators=(",", ":")).encode()
+    sig = hmac.new(settings.SECRET_KEY.encode(), raw, hashlib.sha256).digest()
+    return f"{_b64e(raw)}.{_b64e(sig)}"
+
+
+def verify_reset_token(token: str):
+    try:
+        body_b64, sig_b64 = token.split(".", 1)
+        raw = _b64d(body_b64)
+        expected = hmac.new(settings.SECRET_KEY.encode(), raw, hashlib.sha256).digest()
+        if not hmac.compare_digest(expected, _b64d(sig_b64)):
+            return None
+        body = json.loads(raw)
+        if int(body.get("exp", 0)) < int(time.time()):
+            return None
+        if body.get("type") != "reset":
+            return None
+        return body.get("sub")
+    except Exception:
+        return None
+
+
 def current_tenant(authorization: str = Header(None)) -> TenantContext:
     """
     FastAPI dependency. Requires `Authorization: Bearer <token>`.
