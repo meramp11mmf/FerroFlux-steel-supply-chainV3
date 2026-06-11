@@ -7,12 +7,22 @@ services:
     plan: free
     healthCheckPath: /health
     envVars:
+      # Neon / cloud PostgreSQL connection string — set in Render dashboard
       - key: DATABASE_URL
         sync: false
+      # Auto-generated 64-char secret for JWT signing
       - key: PORTAL_SECRET_KEY
         generateValue: true
+      # Admin login credentials — set in Render dashboard
       - key: PORTAL_USER
         value: admin
-      # Set via Render dashboard — never commit plaintext passwords
       - key: PORTAL_PASS
         sync: false
+      # Airflow is not deployed on Render — set to any non-empty value
+      - key: AIRFLOW_PASSWORD
+        value: not_used_on_render
+      - key: AIRFLOW_BASE_URL
+        value: http://localhost:8089/api/v1
+      # n8n is not deployed on Render — leave blank to disable webhook
+      - key: N8N_WEBHOOK_URL
+        value: ""

@@ -64,7 +64,8 @@ if settings.SECRET_KEY in _WEAK_KEYS or len(settings.SECRET_KEY) < 32:
         "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
     )
 
-if settings.AIRFLOW_PASS in _WEAK_AIRFLOW_PASSES:
+_airflow_is_local = "airflow-webserver" in settings.AIRFLOW_BASE_URL or "localhost" in settings.AIRFLOW_BASE_URL
+if not _airflow_is_local and settings.AIRFLOW_PASS in _WEAK_AIRFLOW_PASSES:
     raise RuntimeError(
         "AIRFLOW_PASSWORD is not set or is still 'admin123'. "
         "Set a strong password in your .env file."
