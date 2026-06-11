@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FerroFlux — Steel Supply-Chain Intelligence Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;800&family=Outfit:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --graphite:#080B10; --graphite-2:#11161D; --graphite-3:#171E27;
+    --line:#1F2833; --ash:#8A929D; --steel:#C7CDD4;
+    --ember:#00AEEF; --ember-2:#3BC8FF; --molten:#FFB547;
+    --cyan:#7DE2FF; --slag:#7D8896;
+    --maxw:1180px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--graphite); color:var(--steel);
+    font-family:'Outfit',sans-serif; line-height:1.65;
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  /* molten grain + furnace glow backdrop */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(900px 600px at 85% -5%, rgba(0,174,239,.16), transparent 60%),
+      radial-gradient(700px 500px at -10% 110%, rgba(125,226,255,.08), transparent 60%);
+  }
+  body::after{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.04;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 28px; position:relative; z-index:1}
+  a{color:inherit; text-decoration:none}
+  .mono{font-family:'JetBrains Mono',monospace}
+
+  /* ---- nav ---- */
+  nav{position:sticky; top:0; z-index:50; backdrop-filter:blur(12px);
+    background:rgba(12,13,15,.72); border-bottom:1px solid var(--line)}
+  .nav-in{display:flex; align-items:center; justify-content:space-between; height:68px}
+  .brand{display:flex; align-items:center; gap:12px; font-family:'Bricolage Grotesque',sans-serif;
+    font-size:24px; letter-spacing:1px; text-transform:uppercase}
+  .brand .spark{width:14px; height:14px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--molten), var(--ember) 60%, #001a2e);
+    box-shadow:0 0 18px var(--ember); animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 10px var(--ember)}50%{box-shadow:0 0 26px var(--ember-2)}}
+  .nav-links{display:flex; gap:30px; align-items:center; font-size:14px; font-weight:500}
+  .nav-links a{color:var(--ash); transition:color .2s}
+  .nav-links a:hover{color:var(--molten)}
+  .btn{font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700;
+    padding:11px 22px; border-radius:6px; text-transform:uppercase; letter-spacing:.5px;
+    border:1px solid var(--ember);
+    transition:all .22s cubic-bezier(0.4,0,0.2,1); cursor:pointer; display:inline-block}
+  .btn-ember{background:var(--ember); color:#080B10}
+  .btn-ember:hover{background:var(--ember-2); box-shadow:0 6px 22px rgba(0,174,239,.45); transform:translateY(-2px)}
+  .btn-ember:active{transform:translateY(0)}
+  .btn-ghost{background:transparent; color:var(--molten); border-color:rgba(255,255,255,.12)}
+  .btn-ghost:hover{border-color:var(--ember); color:var(--ember-2); background:rgba(0,174,239,.06); transform:translateY(-1px)}
+  @media(max-width:780px){.nav-links a:not(.btn){display:none}}
+
+  /* ---- hero ---- */
+  .hero{padding:110px 0 90px; position:relative}
+  .tag{font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:3px;
+    text-transform:uppercase; color:var(--ember); margin-bottom:26px;
+    display:flex; align-items:center; gap:12px}
+  .tag::before{content:""; width:40px; height:1px; background:var(--ember)}
+  h1{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; line-height:.94;
+    font-size:clamp(48px,8.5vw,108px); letter-spacing:-2.5px;
+    color:#fff; max-width:14ch}
+  h1 .hot{background:linear-gradient(100deg,var(--ember),var(--molten) 70%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent}
+  .lede{max-width:60ch; font-size:19px; color:var(--ash); margin:30px 0 38px}
+  .hero-cta{display:flex; gap:16px; flex-wrap:wrap}
+  .reveal{opacity:0; transform:translateY(26px); animation:rise .9s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes rise{to{opacity:1; transform:none}}
+  .d1{animation-delay:.05s}.d2{animation-delay:.18s}.d3{animation-delay:.32s}.d4{animation-delay:.46s}
+
+  /* ticker stat strip */
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
+    background:var(--line); border:1px solid var(--line); margin-top:74px; border-radius:3px; overflow:hidden}
+  .stat{background:var(--graphite-2); padding:26px 22px}
+  .stat .n{font-family:'Bricolage Grotesque',sans-serif; font-size:38px; color:#fff; letter-spacing:.5px}
+  .stat .n span{color:var(--ember)}
+  .stat .l{font-size:12px; color:var(--slag); text-transform:uppercase; letter-spacing:1.5px; margin-top:4px}
+  @media(max-width:780px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+  /* ---- section frame ---- */
+  section{padding:96px 0; position:relative}
+  .eyebrow{font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:3px;
+    text-transform:uppercase; color:var(--cyan); margin-bottom:14px}
+  h2{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; text-transform:uppercase;
+    font-size:clamp(30px,4.4vw,52px); line-height:1; color:#fff; letter-spacing:-.5px; margin-bottom:18px}
+  .sec-intro{max-width:62ch; color:var(--ash); font-size:17px; margin-bottom:50px}
+
+  /* ---- pipeline (medallion) ---- */
+  .pipe{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
+  .layer{position:relative; background:var(--graphite-2); border:1px solid var(--line);
+    border-radius:4px; padding:30px 26px; overflow:hidden; transition:.25s}
+  .layer:hover{transform:translateY(-5px); border-color:var(--ember)}
+  .layer .ix{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--slag)}
+  .layer .badge{display:inline-block; font-family:'JetBrains Mono',monospace; font-size:11px;
+    font-weight:700; letter-spacing:1px; padding:4px 10px; border-radius:2px; margin:14px 0 12px}
+  .b-bronze{background:rgba(205,127,50,.16); color:#cd9b50; border:1px solid rgba(205,127,50,.4)}
+  .b-silver{background:rgba(176,190,197,.14); color:#cfd8dc; border:1px solid rgba(176,190,197,.35)}
+  .b-gold{background:rgba(255,179,71,.16); color:var(--molten); border:1px solid rgba(255,179,71,.4)}
+  .layer h3{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:26px; color:#fff;
+    text-transform:uppercase; letter-spacing:.4px}
+  .layer p{font-size:15px; color:var(--ash); margin:10px 0 16px}
+  .layer ul{list-style:none; font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--steel)}
+  .layer li{padding:5px 0; border-top:1px solid var(--line); display:flex; gap:8px}
+  .layer li::before{content:"›"; color:var(--ember)}
+  .layer .flow{position:absolute; top:50%; right:-30px; font-size:26px; color:var(--ember); z-index:2}
+  @media(max-width:880px){.pipe{grid-template-columns:1fr}.layer .flow{display:none}}
+
+  /* ---- topology ---- */
+  .topo{display:grid; grid-template-columns:1.1fr .9fr; gap:40px; align-items:start}
+  .svc-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px}
+  .svc{background:var(--graphite-2); border:1px solid var(--line); border-left:3px solid var(--cyan);
+    border-radius:3px; padding:16px 18px; transition:.2s}
+  .svc:hover{border-left-color:var(--ember); background:var(--graphite-3)}
+  .svc .sn{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; color:#fff}
+  .svc .sd{font-size:12.5px; color:var(--slag); margin-top:3px}
+  .net-card{background:linear-gradient(160deg,var(--graphite-2),var(--graphite));
+    border:1px solid var(--line); border-radius:4px; padding:30px}
+  .net-card h4{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:22px; text-transform:uppercase;
+    color:#fff; margin-bottom:6px}
+  .net-card .netname{font-family:'JetBrains Mono',monospace; color:var(--cyan); font-size:13px; margin-bottom:20px}
+  .net-row{display:flex; justify-content:space-between; padding:11px 0; border-top:1px solid var(--line);
+    font-family:'JetBrains Mono',monospace; font-size:13px}
+  .net-row span:first-child{color:var(--ash)}
+  .net-row span:last-child{color:var(--molten)}
+  @media(max-width:880px){.topo{grid-template-columns:1fr}}
+
+  /* ---- features (modes) ---- */
+  .modes{display:grid; grid-template-columns:1fr 1fr; gap:24px}
+  .mode{border:1px solid var(--line); border-radius:5px; padding:36px; position:relative; overflow:hidden;
+    background:var(--graphite-2)}
+  .mode::before{content:""; position:absolute; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg,var(--ember),var(--molten))}
+  .mode.cyan::before{background:linear-gradient(90deg,var(--cyan),#3aa89e)}
+  .mode .mt{font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--slag)}
+  .mode h3{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:30px; color:#fff;
+    text-transform:uppercase; margin:8px 0 16px}
+  .mode ul{list-style:none}
+  .mode li{padding:11px 0; border-top:1px solid var(--line); font-size:15px; color:var(--ash); display:flex; gap:12px}
+  .mode li b{color:var(--steel); font-weight:700}
+  .mode li::before{content:"▪"; color:var(--ember)}
+  .mode.cyan li::before{color:var(--cyan)}
+  @media(max-width:780px){.modes{grid-template-columns:1fr}}
+
+  /* ---- QR scan section ---- */
+  .qr-bar{display:flex; align-items:center; gap:12px; margin-bottom:40px; flex-wrap:wrap}
+  .qr-bar label{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--slag);
+    text-transform:uppercase; letter-spacing:1.5px; white-space:nowrap}
+  .qr-bar input{flex:1; min-width:260px; background:var(--graphite); border:1px solid var(--line);
+    border-radius:2px; padding:10px 14px; color:var(--steel); font-family:'JetBrains Mono',monospace;
+    font-size:13px; outline:none; transition:.2s}
+  .qr-bar input:focus{border-color:var(--ember)}
+  .qr-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:24px}
+  @media(max-width:760px){.qr-grid{grid-template-columns:1fr}}
+  .qr-card{background:var(--graphite); border:1px solid var(--line); border-radius:4px;
+    padding:28px 24px; display:flex; flex-direction:column; align-items:center; gap:16px;
+    transition:.25s; position:relative; overflow:hidden}
+  .qr-card::before{content:""; position:absolute; top:0; left:0; right:0; height:3px}
+  .qr-card.c-portfolio::before{background:linear-gradient(90deg,var(--cyan),#3aa89e)}
+  .qr-card.c-demo::before{background:linear-gradient(90deg,var(--ember),var(--molten))}
+  .qr-card.c-login::before{background:linear-gradient(90deg,#a78bfa,#7c3aed)}
+  .qr-card:hover{transform:translateY(-4px); border-color:var(--ember)}
+  .qr-canvas-wrap{background:#fff; padding:12px; border-radius:3px; display:inline-block}
+  .qr-canvas-wrap canvas{display:block}
+  .qr-meta{text-align:center}
+  .qr-title{font-family:'Bricolage Grotesque',sans-serif; font-weight:800; font-size:20px; color:#fff;
+    text-transform:uppercase; letter-spacing:.5px; display:block}
+  .qr-path{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--slag);
+    display:block; margin-top:4px; word-break:break-all}
+  .qr-badge{font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:1.5px;
+    text-transform:uppercase; padding:3px 9px; border-radius:2px; border:1px solid var(--line);
+    color:var(--slag)}
+  .qr-dl-row{display:flex; gap:10px; flex-wrap:wrap; justify-content:center}
+  .qr-tip{color:var(--slag); font-size:13.5px; margin-top:36px; padding:16px 20px;
+    background:var(--graphite); border:1px solid var(--line); border-left:3px solid var(--cyan);
+    border-radius:3px; font-family:'JetBrains Mono',monospace; line-height:1.7}
+
+  /* ---- footer ---- */
+  footer{border-top:1px solid var(--line); padding:48px 0; margin-top:40px}
+  .foot-in{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px}
+  .foot-in .mono{font-size:12.5px; color:var(--slag)}
+  .chip{font-family:'JetBrains Mono',monospace; font-size:11px; padding:3px 10px;
+    border:1px solid var(--line); border-radius:20px; color:var(--ash)}
+  .stack{display:flex; gap:8px; flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-in">
+    <a href="/" class="brand">
+      <img src="/static/logo.png" alt="FerroFlux" style="height:64px;width:auto;object-fit:contain;filter:drop-shadow(0 0 10px rgba(0,174,239,.35));transition:filter .3s"
+           onmouseover="this.style.filter='drop-shadow(0 0 18px rgba(0,174,239,.6))'" onmouseout="this.style.filter='drop-shadow(0 0 10px rgba(0,174,239,.35))'"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div style="display:none;align-items:center;gap:10px;font-family:'Bricolage Grotesque',sans-serif;font-size:24px;letter-spacing:1px;text-transform:uppercase"><span class="spark"></span>FerroFlux</div>
+    </a>
+    <div class="nav-links">
+      <a href="#pipeline">Pipeline</a>
+      <a href="#topology">Topology</a>
+      <a href="#modes">Platform</a>
+      <a href="#scan">QR Code</a>
+      <a href="/demo" class="btn btn-ghost">Live Demo</a>
+      <a href="/login" class="btn btn-ember">Tenant Login</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap">
+  <div class="tag reveal d1">Multi-Tenant · Big-Data · Steel Supply Chain</div>
+  <h1 class="reveal d2">Forging raw <span class="hot"><span style="text-transform:uppercase">factory</span> <span style="text-transform:uppercase">telemetry</span></span> into decisions.</h1>
+  <p class="lede reveal d3">FerroFlux is an end-to-end analytics platform for Egyptian steel producers — a Kafka + Spark medallion pipeline, an Airflow-orchestrated batch tier, and an n8n automation layer, all wrapped in a row-isolated multi-tenant portal. Streaming market prices in, KPIs and anomaly alerts out.</p>
+  <div class="hero-cta reveal d4">
+    <a href="/demo" class="btn btn-ember">Explore the Live Demo →</a>
+    <a href="#pipeline" class="btn btn-ghost">See the Architecture</a>
+  </div>
+
+  <div class="stats reveal d4">
+    <div class="stat"><div class="n">3<span>+1</span></div><div class="l">Medallion Layers</div></div>
+    <div class="stat"><div class="n">11</div><div class="l">Docker Services</div></div>
+    <div class="stat"><div class="n">4</div><div class="l">Kafka Topics</div></div>
+    <div class="stat"><div class="n">100<span>%</span></div><div class="l">Row Isolation</div></div>
+  </div>
+</header>
+
+<!-- PIPELINE -->
+<section id="pipeline" class="wrap">
+  <div class="eyebrow">// data flow</div>
+  <h2>The Medallion Pipeline</h2>
+  <p class="sec-intro">Raw multi-tenant CSV and live Kafka streams enter at Bronze, are cleaned and enriched with steel-specific metrics at Silver, then aggregated into dashboard-ready KPIs at Gold. Every layer writes a uniform <span class="mono">company_id / factory_id / …</span> partition hierarchy.</p>
+  <div class="pipe">
+    <div class="layer">
+      <div class="ix">01 — ingest</div>
+      <div class="badge b-bronze">BRONZE</div>
+      <h3>Raw Capture</h3>
+      <p>Lands market, production, orders, shipments &amp; raw-material feeds as immutable Parquet plus a <span class="mono">raw_data</span> Postgres mirror.</p>
+      <ul><li>Kafka + CSV ingest</li><li>Schema-on-read</li><li>raw_data.* tables</li></ul>
+      <div class="flow">→</div>
+    </div>
+    <div class="layer">
+      <div class="ix">02 — refine</div>
+      <div class="badge b-silver">SILVER</div>
+      <h3>Cleaned Metrics</h3>
+      <p>Computes efficiency, lead times, FX risk and <span class="mono">is_price_spike</span> flags. Anomalies fire an outbound webhook to n8n.</p>
+      <ul><li>partitionBy tenant + leaf</li><li>FX &amp; efficiency scoring</li><li>anomaly → n8n</li></ul>
+      <div class="flow">→</div>
+    </div>
+    <div class="layer">
+      <div class="ix">03 — serve</div>
+      <div class="badge b-gold">GOLD</div>
+      <h3>KPI Aggregates</h3>
+      <p>Daily KPIs, supplier scorecards, regional demand &amp; line efficiency — the tables the tenant dashboard reads under strict scope.</p>
+      <ul><li>analytics.* marts</li><li>ML-ready features</li><li>dashboard source</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- TOPOLOGY -->
+<section id="topology" style="background:var(--graphite-2); border-block:1px solid var(--line)">
+  <div class="wrap">
+    <div class="eyebrow">// infrastructure</div>
+    <h2>Container Topology</h2>
+    <p class="sec-intro">Eleven services share one bridge network, resolving each other by DNS service-name. JDBC and broker strings are environment-driven, so nothing breaks when a host moves.</p>
+    <div class="topo">
+      <div class="svc-grid">
+        <div class="svc"><div class="sn">spark-master</div><div class="sd">Medallion batch + structured streaming</div></div>
+        <div class="svc"><div class="sn">spark-worker</div><div class="sd">Executor capacity</div></div>
+        <div class="svc"><div class="sn">kafka / zookeeper</div><div class="sd">Real-time market + factory streams</div></div>
+        <div class="svc"><div class="sn">kafka-ui</div><div class="sd">Topic inspection</div></div>
+        <div class="svc"><div class="sn">steel-postgres</div><div class="sd">steel_db — raw / processed / analytics</div></div>
+        <div class="svc"><div class="sn">airflow + redis</div><div class="sd">LocalExecutor DAG orchestration</div></div>
+        <div class="svc"><div class="sn">n8n</div><div class="sd">Webhook alerts + market cron harvest</div></div>
+        <div class="svc"><div class="sn">steel-portal</div><div class="sd">FastAPI — this application</div></div>
+      </div>
+      <div class="net-card">
+        <h4>Bridge Network</h4>
+        <div class="netname">steel-network</div>
+        <div class="net-row"><span>DB driver</span><span>jdbc:postgresql</span></div>
+        <div class="net-row"><span>DB host</span><span>steel-postgres:5432</span></div>
+        <div class="net-row"><span>Kafka broker</span><span>kafka:29092</span></div>
+        <div class="net-row"><span>Portal</span><span>:8000</span></div>
+        <div class="net-row"><span>n8n</span><span>:5678</span></div>
+        <div class="net-row"><span>Isolation</span><span>company_id scope</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MODES -->
+<section id="modes" class="wrap">
+  <div class="eyebrow">// the portal</div>
+  <h2>Two Doors, One Platform</h2>
+  <p class="sec-intro">FerroFlux runs as a public engineering portfolio and a secure SaaS workspace from the same FastAPI service.</p>
+  <div class="modes">
+    <div class="mode cyan">
+      <div class="mt">Mode A — Public</div>
+      <h3>Portfolio &amp; Live Demo</h3>
+      <ul>
+        <li><b>Open dashboard.</b> Market price, throughput &amp; supply-chain latency charts — no signup wall.</li>
+        <li><b>Architecture story.</b> The medallion flow and container topology, documented in the open.</li>
+        <li><b>Synthetic stream.</b> Driven by <span class="mono">/api/public/metrics</span> so anyone can explore.</li>
+      </ul>
+      <div style="margin-top:24px"><a href="/demo" class="btn btn-ghost">Open Live Demo</a></div>
+    </div>
+    <div class="mode">
+      <div class="mt">Mode B — Secure</div>
+      <h3>Multi-Tenant SaaS</h3>
+      <ul>
+        <li><b>Row-level isolation.</b> Every query is scoped to your <span class="mono">company_id</span> from a signed token.</li>
+        <li><b>Self-service onboarding.</b> Register factory units with idempotent <span class="mono">ON CONFLICT</span> upserts.</li>
+        <li><b>Data entry.</b> Upload validated Excel feeds that trigger your own Airflow ETL run.</li>
+      </ul>
+      <div style="margin-top:24px"><a href="/login" class="btn btn-ember">Tenant Login →</a></div>
+    </div>
+  </div>
+</section>
+
+<!-- QR SCAN TO VISIT -->
+<section id="scan" style="background:var(--graphite-2); border-block:1px solid var(--line)">
+  <div class="wrap">
+    <div class="eyebrow">// brochure &amp; business card</div>
+    <h2>Scan &amp; Share</h2>
+    <p class="sec-intro">Put any of these QR codes on a brochure or business card — clients scan and land directly on the platform. Update the URL below to your production domain before printing.</p>
+
+    <div class="qr-bar">
+      <label>Site URL</label>
+      <input type="text" id="qrBase" placeholder="https://your-domain.com" />
+      <button class="btn btn-ghost" id="qrRegen" style="white-space:nowrap">↻ Update QR</button>
+    </div>
+
+    <div class="qr-grid">
+
+      <!-- Portfolio -->
+      <div class="qr-card c-portfolio">
+        <div class="qr-canvas-wrap">
+          <img id="qrImg0" width="200" height="200" alt="Portfolio QR" style="display:block" />
+        </div>
+        <div class="qr-meta">
+          <span class="qr-title">Portfolio</span>
+          <span class="qr-path" id="qrP0"></span>
+        </div>
+        <div class="qr-dl-row">
+          <button class="btn btn-ghost" onclick="dlQR(0,'ferroflux-portfolio')" style="font-size:12px;padding:8px 14px">↓ Download PNG</button>
+          <button class="btn btn-ghost" onclick="copyURL(0)" style="font-size:12px;padding:8px 14px">⎘ Copy URL</button>
+        </div>
+      </div>
+
+      <!-- Live Demo -->
+      <div class="qr-card c-demo">
+        <div class="qr-canvas-wrap">
+          <img id="qrImg1" width="200" height="200" alt="Live Demo QR" style="display:block" />
+        </div>
+        <div class="qr-meta">
+          <span class="qr-title">Live Demo</span>
+          <span class="qr-path" id="qrP1"></span>
+        </div>
+        <div class="qr-dl-row">
+          <button class="btn btn-ember" onclick="dlQR(1,'ferroflux-demo')" style="font-size:12px;padding:8px 14px">↓ Download PNG</button>
+          <button class="btn btn-ghost" onclick="copyURL(1)" style="font-size:12px;padding:8px 14px">⎘ Copy URL</button>
+        </div>
+      </div>
+
+      <!-- Tenant Login -->
+      <div class="qr-card c-login">
+        <div class="qr-canvas-wrap">
+          <img id="qrImg2" width="200" height="200" alt="Login QR" style="display:block" />
+        </div>
+        <div class="qr-meta">
+          <span class="qr-title">Tenant Login</span>
+          <span class="qr-path" id="qrP2"></span>
+        </div>
+        <div class="qr-dl-row">
+          <button class="btn btn-ghost" onclick="dlQR(2,'ferroflux-login')" style="font-size:12px;padding:8px 14px">↓ Download PNG</button>
+          <button class="btn btn-ghost" onclick="copyURL(2)" style="font-size:12px;padding:8px 14px">⎘ Copy URL</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="qr-tip">
+      <strong style="color:var(--steel)">For print:</strong>
+      Replace the Site URL above with your public domain (e.g. <span style="color:var(--cyan)">https://ferroflux.yourdomain.com</span>),
+      click <em>Update QR</em>, then download each PNG — 400 × 400 px, ready for Canva, Illustrator, or Word.
+      &nbsp;·&nbsp;
+      <strong style="color:var(--steel)">Quick publish:</strong>
+      run <span style="color:var(--molten); font-family:'JetBrains Mono',monospace">ssh -R 80:localhost:8000 nokey@localhost.run</span> in WSL to get a live public URL in seconds.
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+  var PATHS = ['/', '/demo', '/login'];
+  var _urls  = ['', '', ''];
+
+  function qrSrc(url, size){
+    return 'https://api.qrserver.com/v1/create-qr-code/'
+      + '?size=' + size + 'x' + size
+      + '&margin=12'
+      + '&color=0-0-0'
+      + '&bgcolor=255-255-255'
+      + '&ecc=H'
+      + '&data=' + encodeURIComponent(url);
+  }
+
+  function buildAll(){
+    var raw = document.getElementById('qrBase').value.trim();
+    var base = (raw || window.location.origin).replace(/\/+$/, '');
+    PATHS.forEach(function(p, i){
+      var url = base + p;
+      _urls[i] = url;
+      document.getElementById('qrImg' + i).src = qrSrc(url, 200);
+      document.getElementById('qrP'   + i).textContent = url;
+    });
+  }
+
+  window.dlQR = function(i, filename){
+    var a = document.createElement('a');
+    a.download = filename + '-qr.png';
+    /* fetch as blob so the browser prompts Save-As instead of opening the image */
+    fetch(qrSrc(_urls[i], 400))
+      .then(function(r){ return r.blob(); })
+      .then(function(blob){
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+      })
+      .catch(function(){
+        /* fallback: open in new tab */
+        window.open(qrSrc(_urls[i], 400), '_blank');
+      });
+  };
+
+  window.copyURL = function(i){
+    var lbl = document.getElementById('qrP' + i);
+    navigator.clipboard.writeText(_urls[i]).then(function(){
+      var old = lbl.textContent;
+      lbl.textContent = '✔ copied!';
+      setTimeout(function(){ lbl.textContent = old; }, 1600);
+    });
+  };
+
+  document.getElementById('qrBase').value = window.location.origin;
+  buildAll();
+  document.getElementById('qrRegen').addEventListener('click', buildAll);
+  document.getElementById('qrBase').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') buildAll();
+  });
+})();
+</script>
+
+<footer>
+  <div class="wrap foot-in">
+    <div>
+      <div class="brand">
+        <img src="/static/logo.png" alt="FerroFlux" style="height:42px;object-fit:contain;filter:drop-shadow(0 0 8px rgba(0,174,239,.3))"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+        <div style="display:none;align-items:center;gap:8px;font-size:20px"><span class="spark"></span>FerroFlux</div>
+      </div>
+      <div class="mono" style="margin-top:10px">Big-Data Analytics for Steel Supply-Chain Optimization · V3</div>
+    </div>
+    <div class="stack">
+      <span class="chip">Spark</span><span class="chip">Kafka</span><span class="chip">Airflow</span>
+      <span class="chip">PostgreSQL</span><span class="chip">n8n</span><span class="chip">FastAPI</span><span class="chip">Docker</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
