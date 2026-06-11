@@ -22,8 +22,16 @@ from sqlalchemy import create_engine, text
 
 @st.cache_resource
 def get_engine():
-    # Connection URL built from env vars — no hardcoded credentials
     import os as _os
+    url = _os.getenv("DATABASE_URL", "")
+    # Streamlit Cloud secrets are also exposed as env vars
+    if not url:
+        try:
+            url = st.secrets.get("DATABASE_URL", "")
+        except Exception:
+            pass
+    if url:
+        return create_engine(url, pool_pre_ping=True)
     _u = _os.getenv("PG_USER", _os.getenv("POSTGRES_USER", "steel_admin"))
     _p = _os.getenv("PG_PASSWORD", _os.getenv("POSTGRES_PASSWORD", ""))
     _h = _os.getenv("PG_HOST", "steel-postgres")
