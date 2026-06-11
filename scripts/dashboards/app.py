@@ -84,8 +84,17 @@ st.markdown('''
 
 @st.cache_resource
 def get_engine():
-    # Connection URL built from env vars — no hardcoded credentials
     import os as _os
+    url = _os.getenv("DATABASE_URL", "")
+    if not url:
+        try:
+            url = st.secrets["DATABASE_URL"]
+        except (KeyError, FileNotFoundError):
+            url = ""
+    if url:
+        if url.startswith("postgresql://") and "+psycopg2" not in url:
+            url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return create_engine(url, pool_pre_ping=True)
     _u = _os.getenv("PG_USER", _os.getenv("POSTGRES_USER", "steel_admin"))
     _p = _os.getenv("PG_PASSWORD", _os.getenv("POSTGRES_PASSWORD", ""))
     _h = _os.getenv("PG_HOST", "steel-postgres")
