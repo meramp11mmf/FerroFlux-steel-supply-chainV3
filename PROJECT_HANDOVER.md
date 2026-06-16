@@ -5,13 +5,6 @@
 > anyone (or any AI assistant) understand the whole system and rebuild *every*
 > deliverable from scratch — the Spark pipeline, the FastAPI portal, the n8n
 > automation, and the Docker topology — without needing the prior conversation.
->
-> **نظرة عامة (بالعربي):** ده توثيق كامل للمشروع. لو رجّعتي المشروع تاني، الملف ده
-> لوحده بيكفّي إن أي حد يفهم النظام كله ويعيد بناء كل التسليمات من الصفر — الـ Spark
-> pipeline، البورتال (FastAPI)، أتمتة n8n، وبنية Docker — من غير ما يحتاج المحادثة القديمة.
-
----
-
 ## 0. One-paragraph summary
 
 FerroFlux is a multi-tenant Big-Data analytics platform for Egyptian steel
