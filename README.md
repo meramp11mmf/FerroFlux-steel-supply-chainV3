@@ -252,14 +252,6 @@ docker compose down -v
 | Infrastructure | Docker Compose (13 containers) |
 
 ---
-
-## Author
-
-1.	Maram Moustafa
-2.	Nourhan Saber (Team Leader)
-3.	Hager Elkahlawy
-4.	Haidy Nageh
-5.	Zeinab Elgabalawy
    
 Graduation Project — Big Data Analytics
 
