@@ -254,6 +254,13 @@ docker compose down -v
 ---
    
 Graduation Project — Big Data Analytics
+Author
+Maram Moustafa
+Nourhan Saber 
+Hager Elkahlawy
+Haidy Nageh
+Zeinab Elgabalawy
+Graduation Project — Big Data Analytics
 
 ---
 
